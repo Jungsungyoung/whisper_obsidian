@@ -70,8 +70,9 @@ def _transcribe_local(audio_path: Path, on_progress=None) -> dict:
 
     # 3. 화자 분리 (HF 토큰 필요 - 실패해도 계속)
     try:
-        diarize_model = whisperx.DiarizationPipeline(
-            use_auth_token=config.HF_TOKEN, device=device
+        from whisperx.diarize import DiarizationPipeline as _DiarizationPipeline
+        diarize_model = _DiarizationPipeline(
+            token=config.HF_TOKEN, device=device
         )
         diarize_segments = diarize_model(str(audio_path))
         result = whisperx.assign_word_speakers(diarize_segments, result)

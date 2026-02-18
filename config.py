@@ -16,17 +16,14 @@ UPLOAD_DIR: Path = Path(__file__).parent / "uploads"
 
 def validate_config() -> None:
     """앱 시작 시 설정값 검증 - FastAPI lifespan에서 호출"""
-    missing = []
-    if not OPENAI_API_KEY:
-        missing.append("OPENAI_API_KEY")
-    if not HF_TOKEN:
-        missing.append("HF_TOKEN")
-    if not os.environ.get("VAULT_PATH"):
-        missing.append("VAULT_PATH")
-    if missing:
+    if not OPENAI_API_KEY and not GEMINI_API_KEY:
         raise RuntimeError(
-            f"필수 환경변수 누락: {', '.join(missing)}\n"
-            f".env 파일을 확인하세요 (.env.example 참조)"
+            "LLM API 키 누락: OPENAI_API_KEY 또는 GEMINI_API_KEY 중 하나는 필요합니다.\n"
+            ".env 파일을 확인하세요."
+        )
+    if not os.environ.get("VAULT_PATH"):
+        raise RuntimeError(
+            "필수 환경변수 누락: VAULT_PATH\n.env 파일을 확인하세요."
         )
     vault = Path(os.environ["VAULT_PATH"])
     if not vault.exists():

@@ -19,14 +19,25 @@ def transcribe(audio_path: Path, on_progress=None) -> dict:
         return _transcribe_api(audio_path)
 
 
+def _detect_device() -> tuple[str, str]:
+    """CUDA 사용 가능 여부를 확인해 (device, compute_type) 반환."""
+    try:
+        import ctranslate2
+        if "cuda" in ctranslate2.get_supported_compute_types("cuda"):
+            return "cuda", "float16"
+    except Exception:
+        pass
+    return "cpu", "int8"
+
+
 def _transcribe_local(audio_path: Path, on_progress=None) -> dict:
     from faster_whisper import WhisperModel
 
-    # faster-whisper downloads from HuggingFace (not Azure CDN)
-    # CPU inference with int8 quantization for broad compatibility
+    device, compute_type = _detect_device()
     if on_progress:
-        on_progress(0, "모델 로딩 중...")
-    model = WhisperModel(config.WHISPER_MODEL, device="cpu", compute_type="int8")
+        on_progress(0, f"모델 로딩 중... ({device.upper()})")
+    print(f"[Transcriber] device={device}, compute_type={compute_type}")
+    model = WhisperModel(config.WHISPER_MODEL, device=device, compute_type=compute_type)
     fw_gen, info = model.transcribe(str(audio_path), language="ko", beam_size=5)
 
     # generator를 소비하면서 진행률 콜백 호출

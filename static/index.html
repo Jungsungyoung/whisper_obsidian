@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MeetScribe</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #1a1a2e;
+      color: #e0e0e0;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .card {
+      width: 460px;
+      background: #16213e;
+      border-radius: 16px;
+      padding: 32px;
+      box-shadow: 0 8px 40px rgba(0,0,0,0.5);
+    }
+    h1 { font-size: 1.6rem; color: #7c83fd; margin-bottom: 4px; }
+    .sub { font-size: 0.82rem; color: #666; margin-bottom: 24px; }
+
+    /* drop zone */
+    #drop-zone {
+      border: 2px dashed #7c83fd44;
+      border-radius: 12px;
+      padding: 28px;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color .15s, background .15s;
+      margin-bottom: 18px;
+    }
+    #drop-zone.over { border-color: #7c83fd; background: #7c83fd11; }
+    #drop-zone .ico { font-size: 2rem; margin-bottom: 6px; }
+    #drop-zone .hint { font-size: 0.78rem; color: #555; margin-top: 4px; }
+    #fname { font-size: 0.82rem; color: #7c83fd; margin-top: 6px; min-height: 1em; }
+    input[type=file] { display: none; }
+
+    /* fields */
+    .field { margin-bottom: 14px; }
+    label { display: block; font-size: 0.78rem; color: #888; margin-bottom: 5px; }
+    input[type=text] {
+      width: 100%; padding: 9px 12px;
+      background: #0f3460; border: 1px solid #ffffff11; border-radius: 8px;
+      color: #e0e0e0; font-size: 0.88rem; outline: none;
+      transition: border-color .15s;
+    }
+    input[type=text]:focus { border-color: #7c83fd; }
+
+    /* button */
+    #btn {
+      width: 100%; padding: 13px;
+      background: #7c83fd; color: #fff; border: none; border-radius: 10px;
+      font-size: 0.95rem; font-weight: 600; cursor: pointer;
+      transition: background .15s; margin-top: 4px;
+    }
+    #btn:hover:not(:disabled) { background: #6a71e0; }
+    #btn:disabled { background: #333; color: #666; cursor: not-allowed; }
+
+    /* progress */
+    #progress { margin-top: 22px; display: none; }
+    .step {
+      display: flex; align-items: center; gap: 10px;
+      padding: 7px 0; font-size: 0.88rem; color: #555;
+      border-bottom: 1px solid #ffffff08;
+    }
+    .step:last-child { border-bottom: none; }
+    .step.active { color: #7c83fd; }
+    .step.done { color: #4caf50; }
+    .step .ico { width: 18px; text-align: center; flex-shrink: 0; }
+
+    /* result */
+    #result { margin-top: 18px; display: none; }
+    .result-box { background: #0f3460; border-radius: 10px; padding: 16px; }
+    .result-box p { font-size: 0.82rem; color: #aaa; margin-bottom: 10px; }
+    .obs-btn {
+      display: block; width: 100%; padding: 10px;
+      background: #7c3aed; color: #fff; border: none; border-radius: 8px;
+      font-size: 0.88rem; text-align: center; text-decoration: none; cursor: pointer;
+      margin-bottom: 8px; transition: background .15s;
+    }
+    .obs-btn:last-child { margin-bottom: 0; }
+    .obs-btn:hover { background: #6d28d9; }
+
+    /* error */
+    #err {
+      margin-top: 14px; padding: 12px;
+      background: #3f0000; border: 1px solid #ff4444; border-radius: 8px;
+      font-size: 0.82rem; color: #ff8080; display: none;
+    }
+  </style>
+</head>
+<body>
+<div class="card">
+  <h1>MeetScribe</h1>
+  <p class="sub">회의 녹음 → 자동 전사 → Obsidian 노트</p>
+
+  <div id="drop-zone" role="button" tabindex="0" aria-label="파일 업로드 영역"
+       onclick="document.getElementById('fi').click()"
+       onkeydown="if(event.key==='Enter')document.getElementById('fi').click()">
+    <div class="ico">🎙️</div>
+    <div>파일을 드래그하거나 클릭하세요</div>
+    <div class="hint">mp3 · wav · m4a · mp4</div>
+    <div id="fname"></div>
+  </div>
+  <input type="file" id="fi" accept=".mp3,.wav,.m4a,.mp4,.webm,.ogg">
+
+  <div class="field">
+    <label for="title">회의 제목</label>
+    <input type="text" id="title" placeholder="비워두면 파일명 사용">
+  </div>
+  <div class="field">
+    <label for="project">프로젝트 (선택)</label>
+    <input type="text" id="project" placeholder="예: [[USV Project Dashboard]]">
+  </div>
+
+  <button id="btn" disabled>분석 시작</button>
+
+  <div id="progress">
+    <div class="step" id="s-upload"><span class="ico">⬜</span>업로드</div>
+    <div class="step" id="s-trans"><span class="ico">⬜</span>전사 중 (오디오 길이에 따라 수분 소요)</div>
+    <div class="step" id="s-ai"><span class="ico">⬜</span>AI 분석</div>
+    <div class="step" id="s-save"><span class="ico">⬜</span>Vault 저장</div>
+  </div>
+
+  <div id="err"></div>
+
+  <div id="result">
+    <div class="result-box">
+      <p>완료! Obsidian에서 열기:</p>
+      <a id="lnk-meeting" class="obs-btn" href="#">📝 회의 노트 열기</a>
+      <a id="lnk-transcript" class="obs-btn" href="#">📄 전사 노트 열기</a>
+    </div>
+  </div>
+</div>
+
+<script>
+  const dz = document.getElementById('drop-zone');
+  const fi = document.getElementById('fi');
+  const btn = document.getElementById('btn');
+  const fname = document.getElementById('fname');
+  let file = null;
+
+  dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('over'); });
+  dz.addEventListener('dragleave', () => dz.classList.remove('over'));
+  dz.addEventListener('drop', e => {
+    e.preventDefault(); dz.classList.remove('over');
+    if (e.dataTransfer.files[0]) setFile(e.dataTransfer.files[0]);
+  });
+  fi.addEventListener('change', () => { if (fi.files[0]) setFile(fi.files[0]); });
+
+  function setFile(f) {
+    file = f;
+    fname.textContent = f.name;
+    btn.disabled = false;
+  }
+
+  btn.addEventListener('click', async () => {
+    if (!file) return;
+    btn.disabled = true;
+    show('progress'); hide('result'); hide('err');
+    setStep('s-upload', 'active');
+
+    const fd = new FormData();
+    fd.append('file', file);
+    fd.append('title', document.getElementById('title').value);
+    fd.append('project', document.getElementById('project').value);
+
+    let jobId;
+    try {
+      const r = await fetch('/upload', { method: 'POST', body: fd });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.detail || '업로드 실패');
+      jobId = d.job_id;
+    } catch (e) { return showErr(e.message); }
+
+    setStep('s-upload', 'done');
+    poll(jobId);
+  });
+
+  function poll(id) {
+    const t = setInterval(async () => {
+      try {
+        const d = await fetch(`/status/${id}`).then(r => r.json());
+        if (d.status === 'transcribing') { setStep('s-trans', 'active'); }
+        else if (d.status === 'analyzing') { setStep('s-trans', 'done'); setStep('s-ai', 'active'); }
+        else if (d.status === 'building' || d.status === 'saving') { setStep('s-ai', 'done'); setStep('s-save', 'active'); }
+        else if (d.status === 'done') {
+          clearInterval(t); setStep('s-save', 'done');
+          document.getElementById('lnk-meeting').href = d.result.meeting_uri;
+          document.getElementById('lnk-transcript').href = d.result.transcript_uri;
+          show('result'); btn.disabled = false;
+        } else if (d.status === 'error') {
+          clearInterval(t); showErr(d.error); btn.disabled = false;
+        }
+      } catch (e) { clearInterval(t); showErr(e.message); btn.disabled = false; }
+    }, 2000);
+  }
+
+  const ICONS = { '': '⬜', active: '⏳', done: '✅' };
+  function setStep(id, state) {
+    const el = document.getElementById(id);
+    el.className = `step ${state}`;
+    el.querySelector('.ico').textContent = ICONS[state] ?? '⬜';
+  }
+
+  function show(id) { document.getElementById(id).style.display = ''; }
+  function hide(id) { document.getElementById(id).style.display = 'none'; }
+  function showErr(msg) {
+    const el = document.getElementById('err');
+    el.textContent = '오류: ' + msg;
+    el.style.display = '';
+    btn.disabled = false;
+  }
+</script>
+</body>
+</html>

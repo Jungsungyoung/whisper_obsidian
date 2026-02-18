@@ -111,6 +111,28 @@ def _transcribe_api(audio_path: Path) -> dict:
     }
 
 
+def _convert_whisperx_segments(wx_segments: list) -> list:
+    """WhisperX 세그먼트를 기존 {timestamp, speaker, text} 형식으로 변환."""
+    speaker_map: dict[str, str] = {}
+    counter = [0]
+
+    def label(raw: str) -> str:
+        if raw not in speaker_map:
+            speaker_map[raw] = f"Speaker {chr(ord('A') + counter[0])}"
+            counter[0] += 1
+        return speaker_map[raw]
+
+    result = []
+    for seg in wx_segments:
+        raw_speaker = seg.get("speaker", "SPEAKER_00")
+        result.append({
+            "timestamp": _fmt(seg.get("start", 0)),
+            "speaker": label(raw_speaker),
+            "text": seg.get("text", "").strip(),
+        })
+    return result
+
+
 def _merge_fw(fw_segments: list, diarization) -> list:
     """faster-whisper 세그먼트에 pyannote 화자 레이블 매핑."""
     speaker_map: dict[str, str] = {}

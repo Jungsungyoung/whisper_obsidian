@@ -63,3 +63,36 @@ def test_full_pipeline(tmp_vault, monkeypatch):
 
     print("\n=== 생성된 회의 노트 ===")
     print(Path(res["meeting_path"]).read_text(encoding="utf-8"))
+
+
+def test_convert_whisperx_segments_with_speakers():
+    """WhisperX 세그먼트를 {timestamp, speaker, text} 형식으로 변환."""
+    from pipeline.transcriber import _convert_whisperx_segments
+    wx_segs = [
+        {"start": 0.0,  "end": 3.0,  "text": "안녕하세요", "speaker": "SPEAKER_00"},
+        {"start": 3.5,  "end": 7.0,  "text": "반갑습니다", "speaker": "SPEAKER_01"},
+        {"start": 7.5,  "end": 10.0, "text": "네 맞아요",  "speaker": "SPEAKER_00"},
+    ]
+    result = _convert_whisperx_segments(wx_segs)
+    assert len(result) == 3
+    assert result[0] == {"timestamp": "00:00", "speaker": "Speaker A", "text": "안녕하세요"}
+    assert result[1] == {"timestamp": "00:03", "speaker": "Speaker B", "text": "반갑습니다"}
+    assert result[2] == {"timestamp": "00:07", "speaker": "Speaker A", "text": "네 맞아요"}
+
+
+def test_convert_whisperx_segments_no_speaker():
+    """speaker 키 없을 때 모두 Speaker A 반환."""
+    from pipeline.transcriber import _convert_whisperx_segments
+    wx_segs = [
+        {"start": 0.0, "end": 2.0, "text": "텍스트"},
+    ]
+    result = _convert_whisperx_segments(wx_segs)
+    assert result[0]["speaker"] == "Speaker A"
+
+
+def test_convert_whisperx_segments_empty_text_stripped():
+    """text 앞뒤 공백 제거 확인."""
+    from pipeline.transcriber import _convert_whisperx_segments
+    wx_segs = [{"start": 0.0, "end": 1.0, "text": "  공백  ", "speaker": "SPEAKER_00"}]
+    result = _convert_whisperx_segments(wx_segs)
+    assert result[0]["text"] == "공백"

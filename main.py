@@ -1,4 +1,5 @@
 import uuid
+import time
 from pathlib import Path
 from datetime import date
 from contextlib import asynccontextmanager
@@ -51,7 +52,7 @@ async def upload(
     save_path.write_bytes(await file.read())
 
     effective_title = title.strip() or Path(file.filename).stem
-    job_status[job_id] = {"status": "queued", "step": "", "result": None, "error": None}
+    job_status[job_id] = {"status": "queued", "step": "", "progress": 0, "detail": "", "elapsed": 0, "result": None, "error": None}
     background_tasks.add_task(
         _process, job_id, save_path, effective_title, project.strip(), file.filename
     )
@@ -66,14 +67,29 @@ def get_status(job_id: str):
 
 
 def _process(job_id: str, audio_path: Path, title: str, project: str, original_filename: str):
-    try:
-        _set(job_id, "transcribing", "전사 중...")
-        transcript_result = transcribe(audio_path)
+    start_time = time.time()
 
-        _set(job_id, "analyzing", "AI 분석 중...")
+    def update(status: str, step: str, progress: int = 0, detail: str = ""):
+        job_status[job_id].update({
+            "status": status, "step": step,
+            "progress": progress, "detail": detail,
+            "elapsed": int(time.time() - start_time),
+        })
+
+    def on_transcribe_progress(pct: int, detail: str):
+        job_status[job_id].update({
+            "progress": pct, "detail": detail,
+            "elapsed": int(time.time() - start_time),
+        })
+
+    try:
+        update("transcribing", "전사 중...", 0, "모델 준비 중...")
+        transcript_result = transcribe(audio_path, on_progress=on_transcribe_progress)
+
+        update("analyzing", "AI 분석 중...", 96, "Gemini 분석 중...")
         analysis = analyze_transcript(transcript_result["full_text"])
 
-        _set(job_id, "building", "노트 생성 중...")
+        update("building", "노트 생성 중...", 98, "노트 빌드 중...")
         speakers = sorted({seg["speaker"] for seg in transcript_result["segments"]})
         note_data = NoteData(
             date=date.today(),
@@ -90,18 +106,23 @@ def _process(job_id: str, audio_path: Path, title: str, project: str, original_f
             project=project,
         )
 
-        _set(job_id, "saving", "Vault에 저장 중...")
+        update("saving", "Vault에 저장 중...", 99, "파일 저장 중...")
         writer = VaultWriter(config.VAULT_PATH, config.MEETINGS_FOLDER)
         result = writer.save(note_data, build_meeting_note(note_data), build_transcript_note(note_data))
 
-        job_status[job_id] = {"status": "done", "step": "완료", "result": result, "error": None}
+        job_status[job_id].update({
+            "status": "done", "step": "완료", "progress": 100,
+            "detail": f"총 {int(time.time() - start_time)}초 소요",
+            "elapsed": int(time.time() - start_time), "result": result, "error": None,
+        })
 
     except Exception as e:
-        job_status[job_id] = {"status": "error", "step": "오류", "result": None, "error": str(e)}
+        job_status[job_id].update({
+            "status": "error", "step": "오류", "progress": 0,
+            "detail": str(e), "result": None, "error": str(e),
+        })
     finally:
         if audio_path.exists():
             audio_path.unlink()
 
 
-def _set(job_id: str, status: str, step: str):
-    job_status[job_id] = {"status": status, "step": step, "result": None, "error": None}

@@ -2,7 +2,7 @@ from pathlib import Path
 import config
 
 
-def transcribe(audio_path: Path) -> dict:
+def transcribe(audio_path: Path, on_progress=None) -> dict:
     """
     오디오 파일을 전사. 화자 분리 포함.
     로컬 Whisper + pyannote 우선, 실패 시 OpenAI API 폴백.
@@ -13,20 +13,32 @@ def transcribe(audio_path: Path) -> dict:
         method:    "local" | "api"
     """
     try:
-        return _transcribe_local(audio_path)
+        return _transcribe_local(audio_path, on_progress)
     except Exception as e:
         print(f"[Transcriber] 로컬 Whisper 실패: {e}. OpenAI API로 폴백.")
         return _transcribe_api(audio_path)
 
 
-def _transcribe_local(audio_path: Path) -> dict:
+def _transcribe_local(audio_path: Path, on_progress=None) -> dict:
     from faster_whisper import WhisperModel
 
     # faster-whisper downloads from HuggingFace (not Azure CDN)
     # CPU inference with int8 quantization for broad compatibility
+    if on_progress:
+        on_progress(0, "모델 로딩 중...")
     model = WhisperModel(config.WHISPER_MODEL, device="cpu", compute_type="int8")
-    fw_segments, info = model.transcribe(str(audio_path), language="ko", beam_size=5)
-    fw_segments = list(fw_segments)  # generator → list
+    fw_gen, info = model.transcribe(str(audio_path), language="ko", beam_size=5)
+
+    # generator를 소비하면서 진행률 콜백 호출
+    total = info.duration or 1.0
+    fw_segments = []
+    for seg in fw_gen:
+        fw_segments.append(seg)
+        if on_progress:
+            pct = min(int(seg.end / total * 95), 95)  # 95%까지만 (후처리 여유)
+            cur = f"{int(seg.end // 60):02d}:{int(seg.end % 60):02d}"
+            tot = f"{int(total // 60):02d}:{int(total % 60):02d}"
+            on_progress(pct, f"전사 중... {cur} / {tot}")
 
     # pyannote 화자 분리 시도 (선택적)
     diarization = None

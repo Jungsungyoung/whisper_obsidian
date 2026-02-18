@@ -74,6 +74,22 @@
     .step.done { color: #4caf50; }
     .step .ico { width: 18px; text-align: center; flex-shrink: 0; }
 
+    /* progress bar */
+    #progress-bar-wrap {
+      margin-top: 14px; background: #0f3460;
+      border-radius: 99px; height: 6px; overflow: hidden;
+    }
+    #progress-bar {
+      height: 100%; width: 0%; background: #7c83fd;
+      border-radius: 99px; transition: width 0.4s ease;
+    }
+    #progress-detail {
+      margin-top: 8px; font-size: 0.75rem; color: #666;
+      min-height: 1.2em; display: flex; justify-content: space-between;
+    }
+    #progress-detail .detail-text { color: #7c83fd88; }
+    #progress-detail .elapsed-text { color: #444; }
+
     /* result */
     #result { margin-top: 18px; display: none; }
     .result-box { background: #0f3460; border-radius: 10px; padding: 16px; }
@@ -123,9 +139,16 @@
 
   <div id="progress">
     <div class="step" id="s-upload"><span class="ico">⬜</span>업로드</div>
-    <div class="step" id="s-trans"><span class="ico">⬜</span>전사 중 (오디오 길이에 따라 수분 소요)</div>
-    <div class="step" id="s-ai"><span class="ico">⬜</span>AI 분석</div>
+    <div class="step" id="s-trans"><span class="ico">⬜</span>Whisper 전사</div>
+    <div class="step" id="s-ai"><span class="ico">⬜</span>Gemini AI 분석</div>
     <div class="step" id="s-save"><span class="ico">⬜</span>Vault 저장</div>
+    <div id="progress-bar-wrap">
+      <div id="progress-bar"></div>
+    </div>
+    <div id="progress-detail">
+      <span class="detail-text" id="detail-text"></span>
+      <span class="elapsed-text" id="elapsed-text"></span>
+    </div>
   </div>
 
   <div id="err"></div>
@@ -187,19 +210,38 @@
     const t = setInterval(async () => {
       try {
         const d = await fetch(`/status/${id}`).then(r => r.json());
-        if (d.status === 'transcribing') { setStep('s-trans', 'active'); }
-        else if (d.status === 'analyzing') { setStep('s-trans', 'done'); setStep('s-ai', 'active'); }
-        else if (d.status === 'building' || d.status === 'saving') { setStep('s-ai', 'done'); setStep('s-save', 'active'); }
-        else if (d.status === 'done') {
-          clearInterval(t); setStep('s-save', 'done');
+
+        // 단계 표시
+        if (d.status === 'transcribing') {
+          setStep('s-trans', 'active');
+        } else if (d.status === 'analyzing') {
+          setStep('s-trans', 'done'); setStep('s-ai', 'active');
+        } else if (d.status === 'building' || d.status === 'saving') {
+          setStep('s-ai', 'done'); setStep('s-save', 'active');
+        } else if (d.status === 'done') {
+          clearInterval(t);
+          setStep('s-save', 'done');
+          setProgress(100, d.detail || '완료', d.elapsed);
           document.getElementById('lnk-meeting').href = d.result.meeting_uri;
           document.getElementById('lnk-transcript').href = d.result.transcript_uri;
           show('result'); btn.disabled = false;
+          return;
         } else if (d.status === 'error') {
           clearInterval(t); showErr(d.error); btn.disabled = false;
+          return;
         }
+
+        // 프로그레스 바 + 상세 메시지 업데이트
+        setProgress(d.progress || 0, d.detail || '', d.elapsed || 0);
       } catch (e) { clearInterval(t); showErr(e.message); btn.disabled = false; }
-    }, 2000);
+    }, 1500);
+  }
+
+  function setProgress(pct, detail, elapsed) {
+    document.getElementById('progress-bar').style.width = pct + '%';
+    document.getElementById('detail-text').textContent = detail;
+    document.getElementById('elapsed-text').textContent =
+      elapsed > 0 ? `경과 ${elapsed}초` : '';
   }
 
   const ICONS = { '': '⬜', active: '⏳', done: '✅' };

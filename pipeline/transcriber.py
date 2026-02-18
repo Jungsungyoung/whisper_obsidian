@@ -20,28 +20,39 @@ def transcribe(audio_path: Path) -> dict:
 
 
 def _transcribe_local(audio_path: Path) -> dict:
-    import torch
-    import whisper
-    from pyannote.audio import Pipeline
+    from faster_whisper import WhisperModel
 
-    model = whisper.load_model(config.WHISPER_MODEL)
-    result = model.transcribe(str(audio_path), word_timestamps=True, language="ko")
+    # faster-whisper downloads from HuggingFace (not Azure CDN)
+    # CPU inference with int8 quantization for broad compatibility
+    model = WhisperModel(config.WHISPER_MODEL, device="cpu", compute_type="int8")
+    fw_segments, info = model.transcribe(str(audio_path), language="ko", beam_size=5)
+    fw_segments = list(fw_segments)  # generator → list
 
-    pipeline = Pipeline.from_pretrained(
-        "pyannote/speaker-diarization-3.1",
-        use_auth_token=config.HF_TOKEN,
-    )
-    if torch.cuda.is_available():
-        pipeline = pipeline.to(torch.device("cuda"))
+    # pyannote 화자 분리 시도 (선택적)
+    diarization = None
+    try:
+        from pyannote.audio import Pipeline
+        pipeline = Pipeline.from_pretrained(
+            "pyannote/speaker-diarization-3.1",
+            use_auth_token=config.HF_TOKEN,
+        )
+        try:
+            import torch
+            if torch.cuda.is_available():
+                pipeline = pipeline.to(torch.device("cuda"))
+        except ImportError:
+            pass
+        diarization = pipeline(str(audio_path))
+    except Exception as e:
+        print(f"[Transcriber] 화자 분리 생략: {e}")
 
-    diarization = pipeline(str(audio_path))
-    segments = _merge(result["segments"], diarization)
-    full_text = " ".join(seg["text"].strip() for seg in result["segments"])
+    segments = _merge_fw(fw_segments, diarization)
+    full_text = " ".join(seg.text.strip() for seg in fw_segments)
 
     return {
         "segments": segments,
         "full_text": full_text,
-        "duration": _fmt(result.get("duration") or 0),
+        "duration": _fmt(info.duration if info.duration else 0),
         "method": "local",
     }
 
@@ -75,6 +86,33 @@ def _transcribe_api(audio_path: Path) -> dict:
         "duration": duration,
         "method": "api",
     }
+
+
+def _merge_fw(fw_segments: list, diarization) -> list:
+    """faster-whisper 세그먼트에 pyannote 화자 레이블 매핑."""
+    speaker_map: dict[str, str] = {}
+    counter = [0]
+
+    def label(raw: str) -> str:
+        if raw not in speaker_map:
+            speaker_map[raw] = f"Speaker {chr(ord('A') + counter[0])}"
+            counter[0] += 1
+        return speaker_map[raw]
+
+    result = []
+    for seg in fw_segments:
+        speaker = "Speaker A"
+        if diarization is not None:
+            for turn, _, raw_label in diarization.itertracks(yield_label=True):
+                if turn.start <= seg.start <= turn.end:
+                    speaker = label(raw_label)
+                    break
+        result.append({
+            "timestamp": _fmt(seg.start),
+            "speaker": speaker,
+            "text": seg.text.strip(),
+        })
+    return result
 
 
 def _merge(whisper_segments: list, diarization) -> list:

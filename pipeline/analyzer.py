@@ -1,5 +1,4 @@
 import re
-from openai import OpenAI
 import config
 
 SYSTEM_PROMPT = """당신은 회의록 분석 전문가입니다.
@@ -25,6 +24,20 @@ FOLLOW_UP:
 
 
 def analyze_transcript(transcript_text: str) -> dict:
+    """OpenAI 우선, 실패 시 HuggingFace Inference API 폴백."""
+    try:
+        return _analyze_openai(transcript_text)
+    except Exception as e:
+        print(f"[Analyzer] OpenAI 실패: {e}. HuggingFace API로 폴백.")
+        try:
+            return _analyze_hf(transcript_text)
+        except Exception as e2:
+            print(f"[Analyzer] HuggingFace 실패: {e2}. 기본 분석 사용.")
+            return _analyze_basic(transcript_text)
+
+
+def _analyze_openai(transcript_text: str) -> dict:
+    from openai import OpenAI
     client = OpenAI(api_key=config.OPENAI_API_KEY)
     response = client.chat.completions.create(
         model=config.LLM_MODEL,
@@ -35,6 +48,53 @@ def analyze_transcript(transcript_text: str) -> dict:
         temperature=0.3,
     )
     return parse_llm_response(response.choices[0].message.content)
+
+
+def _analyze_hf(transcript_text: str) -> dict:
+    """HuggingFace Inference API를 통한 분석."""
+    import json
+    import urllib.request
+
+    model_id = "mistralai/Mistral-7B-Instruct-v0.3"
+    prompt = (
+        f"<s>[INST] {SYSTEM_PROMPT}\n\n"
+        f"다음 회의 내용을 분석해주세요:\n\n{transcript_text} [/INST]"
+    )
+
+    payload = json.dumps({
+        "inputs": prompt,
+        "parameters": {"max_new_tokens": 512, "temperature": 0.3, "return_full_text": False},
+    }).encode()
+
+    req = urllib.request.Request(
+        f"https://api-inference.huggingface.co/models/{model_id}",
+        data=payload,
+        headers={
+            "Authorization": f"Bearer {config.HF_TOKEN}",
+            "Content-Type": "application/json",
+        },
+    )
+    with urllib.request.urlopen(req, timeout=60) as r:
+        result = json.loads(r.read())
+
+    if isinstance(result, list) and result:
+        text = result[0].get("generated_text", "")
+    else:
+        text = str(result)
+
+    return parse_llm_response(text)
+
+
+def _analyze_basic(transcript_text: str) -> dict:
+    """LLM 없이 기본 분석 (전사본에서 핵심 문장 추출)."""
+    lines = [l.strip() for l in transcript_text.split(".") if len(l.strip()) > 10]
+    return {
+        "purpose": lines[0] if lines else "회의 분석 불가 (API 연결 실패)",
+        "discussion": lines[1:4] if len(lines) > 1 else [],
+        "decisions": [],
+        "action_items": [],
+        "follow_up": ["API 연결 복구 후 재분석을 권장합니다."],
+    }
 
 
 def parse_llm_response(response: str) -> dict:

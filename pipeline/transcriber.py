@@ -31,51 +31,66 @@ def _detect_device() -> tuple[str, str]:
 
 
 def _transcribe_local(audio_path: Path, on_progress=None) -> dict:
-    from faster_whisper import WhisperModel
+    import whisperx
+    import whisperx.audio
 
     device, compute_type = _detect_device()
     if on_progress:
         on_progress(0, f"모델 로딩 중... ({device.upper()})")
-    print(f"[Transcriber] device={device}, compute_type={compute_type}")
-    model = WhisperModel(config.WHISPER_MODEL, device=device, compute_type=compute_type)
-    fw_gen, info = model.transcribe(str(audio_path), language="ko", beam_size=5)
+    print(f"[Transcriber] WhisperX device={device}, compute_type={compute_type}")
 
-    # generator를 소비하면서 진행률 콜백 호출
-    total = info.duration or 1.0
-    fw_segments = []
-    for seg in fw_gen:
-        fw_segments.append(seg)
-        if on_progress:
-            pct = min(int(seg.end / total * 95), 95)  # 95%까지만 (후처리 여유)
-            cur = f"{int(seg.end // 60):02d}:{int(seg.end % 60):02d}"
-            tot = f"{int(total // 60):02d}:{int(total % 60):02d}"
-            on_progress(pct, f"전사 중... {cur} / {tot}")
+    # batch_size: GPU는 16, CPU는 4 (메모리 절약)
+    batch_size = 16 if device == "cuda" else 4
 
-    # pyannote 화자 분리 시도 (선택적)
-    diarization = None
+    # 1. 전사
+    model = whisperx.load_model(
+        config.WHISPER_MODEL, device,
+        compute_type=compute_type, language="ko"
+    )
+    audio = whisperx.load_audio(str(audio_path))
+    result = model.transcribe(audio, batch_size=batch_size)
+    if on_progress:
+        on_progress(40, "전사 완료, 단어 정렬 중...")
+
+    # 2. 단어 단위 정렬 (speaker 매핑 정확도 향상)
     try:
-        from pyannote.audio import Pipeline
-        pipeline = Pipeline.from_pretrained(
-            "pyannote/speaker-diarization-3.1",
-            use_auth_token=config.HF_TOKEN,
+        align_model, metadata = whisperx.load_align_model(
+            language_code="ko", device=device
         )
-        try:
-            import torch
-            if torch.cuda.is_available():
-                pipeline = pipeline.to(torch.device("cuda"))
-        except ImportError:
-            pass
-        diarization = pipeline(str(audio_path))
+        result = whisperx.align(
+            result["segments"], align_model, metadata, audio, device,
+            return_char_alignments=False
+        )
+        if on_progress:
+            on_progress(70, "화자 분리 중...")
+    except Exception as e:
+        print(f"[Transcriber] 단어 정렬 생략: {e}")
+        if on_progress:
+            on_progress(70, "화자 분리 중...")
+
+    # 3. 화자 분리 (HF 토큰 필요 - 실패해도 계속)
+    try:
+        diarize_model = whisperx.DiarizationPipeline(
+            use_auth_token=config.HF_TOKEN, device=device
+        )
+        diarize_segments = diarize_model(str(audio_path))
+        result = whisperx.assign_word_speakers(diarize_segments, result)
+        if on_progress:
+            on_progress(90, "변환 중...")
     except Exception as e:
         print(f"[Transcriber] 화자 분리 생략: {e}")
+        if on_progress:
+            on_progress(90, "변환 중...")
 
-    segments = _merge_fw(fw_segments, diarization)
-    full_text = " ".join(seg.text.strip() for seg in fw_segments)
+    # 4. 기존 인터페이스로 변환
+    segments = _convert_whisperx_segments(result["segments"])
+    full_text = " ".join(s["text"] for s in segments if s["text"])
+    duration_sec = len(audio) / whisperx.audio.SAMPLE_RATE
 
     return {
         "segments": segments,
         "full_text": full_text,
-        "duration": _fmt(info.duration if info.duration else 0),
+        "duration": _fmt(duration_sec),
         "method": "local",
     }
 
@@ -131,60 +146,6 @@ def _convert_whisperx_segments(wx_segments: list) -> list:
             "timestamp": _fmt(seg.get("start", 0)),
             "speaker": label(raw_speaker),
             "text": (seg.get("text") or "").strip(),
-        })
-    return result
-
-
-def _merge_fw(fw_segments: list, diarization) -> list:
-    """faster-whisper 세그먼트에 pyannote 화자 레이블 매핑."""
-    speaker_map: dict[str, str] = {}
-    counter = [0]
-
-    def label(raw: str) -> str:
-        if raw not in speaker_map:
-            speaker_map[raw] = f"Speaker {chr(ord('A') + counter[0])}"
-            counter[0] += 1
-        return speaker_map[raw]
-
-    result = []
-    for seg in fw_segments:
-        speaker = "Speaker A"
-        if diarization is not None:
-            for turn, _, raw_label in diarization.itertracks(yield_label=True):
-                if turn.start <= seg.start <= turn.end:
-                    speaker = label(raw_label)
-                    break
-        result.append({
-            "timestamp": _fmt(seg.start),
-            "speaker": speaker,
-            "text": seg.text.strip(),
-        })
-    return result
-
-
-def _merge(whisper_segments: list, diarization) -> list:
-    """Whisper 세그먼트에 pyannote 화자 레이블 매핑."""
-    speaker_map: dict[str, str] = {}
-    counter = [0]
-
-    def label(raw: str) -> str:
-        if raw not in speaker_map:
-            speaker_map[raw] = f"Speaker {chr(ord('A') + counter[0])}"
-            counter[0] += 1
-        return speaker_map[raw]
-
-    result = []
-    for seg in whisper_segments:
-        start = seg["start"]
-        speaker = "Speaker A"
-        for turn, _, raw_label in diarization.itertracks(yield_label=True):
-            if turn.start <= start <= turn.end:
-                speaker = label(raw_label)
-                break
-        result.append({
-            "timestamp": _fmt(start),
-            "speaker": speaker,
-            "text": seg["text"].strip(),
         })
     return result
 

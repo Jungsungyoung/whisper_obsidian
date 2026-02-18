@@ -5,6 +5,7 @@ from dotenv import load_dotenv
 load_dotenv(Path(__file__).parent / ".env", override=True)
 
 OPENAI_API_KEY: str = os.environ.get("OPENAI_API_KEY", "").strip()
+GEMINI_API_KEY: str = os.environ.get("GEMINI_API_KEY", "").strip()
 HF_TOKEN: str = os.environ.get("HF_TOKEN", "").strip()
 WHISPER_MODEL: str = os.getenv("WHISPER_MODEL", "base")
 LLM_MODEL: str = os.getenv("LLM_MODEL", "gpt-4o-mini")

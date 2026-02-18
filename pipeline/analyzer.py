@@ -24,23 +24,40 @@ FOLLOW_UP:
 
 
 def analyze_transcript(transcript_text: str) -> dict:
-    """OpenAI 우선, 실패 시 HuggingFace Inference API 폴백."""
-    try:
-        return _analyze_openai(transcript_text)
-    except Exception as e:
-        print(f"[Analyzer] OpenAI 실패: {e}. HuggingFace API로 폴백.")
+    """Gemini 우선, 실패 시 OpenAI, 마지막은 기본 추출."""
+    if config.GEMINI_API_KEY:
         try:
-            return _analyze_hf(transcript_text)
-        except Exception as e2:
-            print(f"[Analyzer] HuggingFace 실패: {e2}. 기본 분석 사용.")
-            return _analyze_basic(transcript_text)
+            return _analyze_gemini(transcript_text)
+        except Exception as e:
+            print(f"[Analyzer] Gemini 실패: {e}. OpenAI로 폴백.")
+
+    if config.OPENAI_API_KEY:
+        try:
+            return _analyze_openai(transcript_text)
+        except Exception as e:
+            print(f"[Analyzer] OpenAI 실패: {e}. 기본 분석 사용.")
+
+    return _analyze_basic(transcript_text)
+
+
+def _analyze_gemini(transcript_text: str) -> dict:
+    from google import genai
+
+    client = genai.Client(api_key=config.GEMINI_API_KEY)
+    prompt = f"{SYSTEM_PROMPT}\n\n다음 회의 내용을 분석해주세요:\n\n{transcript_text}"
+    response = client.models.generate_content(
+        model=config.LLM_MODEL,
+        contents=prompt,
+    )
+    return parse_llm_response(response.text)
 
 
 def _analyze_openai(transcript_text: str) -> dict:
     from openai import OpenAI
+
     client = OpenAI(api_key=config.OPENAI_API_KEY)
     response = client.chat.completions.create(
-        model=config.LLM_MODEL,
+        model="gpt-4o-mini",
         messages=[
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": f"다음 회의 내용을 분석해주세요:\n\n{transcript_text}"},
@@ -48,41 +65,6 @@ def _analyze_openai(transcript_text: str) -> dict:
         temperature=0.3,
     )
     return parse_llm_response(response.choices[0].message.content)
-
-
-def _analyze_hf(transcript_text: str) -> dict:
-    """HuggingFace Inference API를 통한 분석."""
-    import json
-    import urllib.request
-
-    model_id = "mistralai/Mistral-7B-Instruct-v0.3"
-    prompt = (
-        f"<s>[INST] {SYSTEM_PROMPT}\n\n"
-        f"다음 회의 내용을 분석해주세요:\n\n{transcript_text} [/INST]"
-    )
-
-    payload = json.dumps({
-        "inputs": prompt,
-        "parameters": {"max_new_tokens": 512, "temperature": 0.3, "return_full_text": False},
-    }).encode()
-
-    req = urllib.request.Request(
-        f"https://api-inference.huggingface.co/models/{model_id}",
-        data=payload,
-        headers={
-            "Authorization": f"Bearer {config.HF_TOKEN}",
-            "Content-Type": "application/json",
-        },
-    )
-    with urllib.request.urlopen(req, timeout=60) as r:
-        result = json.loads(r.read())
-
-    if isinstance(result, list) and result:
-        text = result[0].get("generated_text", "")
-    else:
-        text = str(result)
-
-    return parse_llm_response(text)
 
 
 def _analyze_basic(transcript_text: str) -> dict:

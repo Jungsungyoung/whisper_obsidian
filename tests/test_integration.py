@@ -96,3 +96,11 @@ def test_convert_whisperx_segments_empty_text_stripped():
     wx_segs = [{"start": 0.0, "end": 1.0, "text": "  공백  ", "speaker": "SPEAKER_00"}]
     result = _convert_whisperx_segments(wx_segs)
     assert result[0]["text"] == "공백"
+
+
+def test_convert_whisperx_segments_none_text():
+    """text 값이 None일 때 빈 문자열 반환."""
+    from pipeline.transcriber import _convert_whisperx_segments
+    wx_segs = [{"start": 0.0, "end": 1.0, "text": None, "speaker": "SPEAKER_00"}]
+    result = _convert_whisperx_segments(wx_segs)
+    assert result[0]["text"] == ""

@@ -118,6 +118,8 @@ def _convert_whisperx_segments(wx_segments: list) -> list:
 
     def label(raw: str) -> str:
         if raw not in speaker_map:
+            if counter[0] >= 26:
+                raise ValueError(f"Speaker count exceeds 26; cannot assign label for '{raw}'")
             speaker_map[raw] = f"Speaker {chr(ord('A') + counter[0])}"
             counter[0] += 1
         return speaker_map[raw]
@@ -128,7 +130,7 @@ def _convert_whisperx_segments(wx_segments: list) -> list:
         result.append({
             "timestamp": _fmt(seg.get("start", 0)),
             "speaker": label(raw_speaker),
-            "text": seg.get("text", "").strip(),
+            "text": (seg.get("text") or "").strip(),
         })
     return result
 

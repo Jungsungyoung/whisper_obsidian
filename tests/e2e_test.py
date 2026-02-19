@@ -6,7 +6,7 @@ import time
 from pathlib import Path
 
 
-PROJECT_ROOT = Path(__file__).resolve().parent
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
 CUDA_DLL_PATH = os.getenv("CUDA_DLL_PATH", r"D:\cuda_libs\dlls")
 DEFAULT_AUDIO = PROJECT_ROOT / "tests" / "sample.mp3"
 AUDIO = Path(os.getenv("MEETSCRIBE_E2E_AUDIO", str(DEFAULT_AUDIO)))

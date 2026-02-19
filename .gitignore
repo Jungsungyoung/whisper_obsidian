@@ -2,6 +2,7 @@
 uploads/
 local-vault/
 tmp_pytest/
+.tmp_pytest/
 __pycache__/
 *.pyc
 *.pyo

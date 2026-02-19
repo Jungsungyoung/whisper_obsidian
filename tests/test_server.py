@@ -9,7 +9,7 @@ import urllib.request
 from pathlib import Path
 
 
-PROJECT_ROOT = Path(__file__).resolve().parent
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
 CUDA_DLL_PATH = os.getenv("CUDA_DLL_PATH", r"D:\cuda_libs\dlls")
 SERVER_URL = os.getenv("MEETSCRIBE_SERVER_URL", "http://localhost:8765")
 DEFAULT_AUDIO = PROJECT_ROOT / "tests" / "sample.mp3"

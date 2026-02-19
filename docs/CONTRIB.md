@@ -1,7 +1,7 @@
 # MeetScribe 개발 기여 가이드
 
-> 소스 기준: `meetscribe/requirements.txt`, `meetscribe/.env.example`, `meetscribe/config.py`
-> 최종 업데이트: 2026-02-19
+> 소스 기준: `requirements.txt`, `.env.example`, `config.py`
+> 최종 업데이트: 2026-02-20
 
 ---
 
@@ -46,6 +46,8 @@ pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu121
 |--------|------|------|
 | `fastapi` | 0.115.0 | 웹 서버 프레임워크 |
 | `uvicorn[standard]` | 0.30.0 | ASGI 서버 |
+| `itsdangerous` | ≥ 2.1 | PIN 인증 세션 서명 |
+| `qrcode` | ≥ 7.0 | 모바일 접속 QR 코드 생성 |
 | `openai-whisper` | 20240930 | 음성 전사 (폴백용) |
 | `whisperx` | 3.8.1 | 로컬 음성 전사 (주 엔진) |
 | `pyannote.audio` | 3.3.2 | 화자 분리 |
@@ -59,10 +61,12 @@ pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu121
 ## 2. 환경변수 설정
 
 ```bash
-cp meetscribe/.env.example meetscribe/.env
+cp .env.example .env
 ```
 
 `.env` 파일을 편집합니다:
+
+### 필수 / 핵심 변수
 
 | 변수 | 필수 | 기본값 | 설명 |
 |------|------|--------|------|
@@ -72,11 +76,30 @@ cp meetscribe/.env.example meetscribe/.env
 | `WHISPER_MODEL` | 선택 | `base` | Whisper 모델 크기 (`tiny`/`base`/`small`/`medium`/`large`) |
 | `LLM_MODEL` | 선택 | `gemini-2.0-flash` | 분석에 사용할 LLM 모델명 |
 | `VAULT_PATH` | 필수 | - | Obsidian Vault 절대 경로 |
-| `MEETINGS_FOLDER` | 선택 | `10_Calendar/13_Meetings` | Vault 내 회의 노트 저장 위치 |
 | `ALLOW_CPU` | 선택 | `false` | CPU 모드 허용 (`true` 설정 시 GPU 없어도 실행) |
-| `DOMAIN_VOCAB` | 선택 | 함정, 선박, … | 전사 정확도 향상을 위한 도메인 어휘 목록 |
+| `DOMAIN_VOCAB` | 선택 | - | 전사 정확도 향상을 위한 도메인 어휘 목록 (쉼표 구분) |
 
 > \* `GEMINI_API_KEY` 또는 `OPENAI_API_KEY` 중 **하나 이상** 필수
+
+### Vault 폴더 경로 변수
+
+| 변수 | 기본값 | 카테고리 |
+|------|--------|----------|
+| `MEETINGS_FOLDER` | `10_Calendar/13_Meetings` | 회의 (`meeting`) |
+| `INBOX_FOLDER` | `00_Inbox` | 보이스메모 (`voice_memo`) |
+| `DAILY_FOLDER` | `10_Calendar/11_Daily` | 일간 노트 (`daily`) |
+| `AREAS_FOLDER` | `30_Areas` | 강의 (`lecture`) |
+| `PROJECTS_FOLDER` | `20_Projects` | 프로젝트 논의 (`discussion`) |
+| `RESOURCES_FOLDER` | `40_Resources` | 레퍼런스 (`reference`) |
+
+### 모바일 접속 보안 변수
+
+| 변수 | 기본값 | 설명 |
+|------|--------|------|
+| `ACCESS_PIN` | `""` (인증 없음) | 숫자 PIN (설정 시 로그인 필요) |
+| `SECRET_KEY` | 랜덤 생성 | 세션 쿠키 서명 키 (재시작 시 로그인 유지 불가) |
+
+> 원격 접속 시 `ACCESS_PIN` 설정 강력 권장
 
 ### HuggingFace 라이선스 동의 (화자 분리 사용 시)
 
@@ -91,9 +114,10 @@ cp meetscribe/.env.example meetscribe/.env
 
 | 명령어 | 설명 |
 |--------|------|
-| `run.bat` | Windows 전용 실행 스크립트 (CUDA 경로 포함) |
+| `run.bat` | Windows 전용 실행 스크립트 (CUDA 경로 포함, `cloudflared` 자동 감지) |
 | `uvicorn main:app --host 0.0.0.0 --port 8765` | 서버 직접 실행 |
-| `python main.py` | 서버 직접 실행 (동일) |
+| `python tunnel.py` | Cloudflare Tunnel 단독 실행 (QR 코드 출력) |
+| `python diagnose.py` | 환경 진단 |
 
 서버 시작 후 브라우저에서 **http://localhost:8765** 접속.
 
@@ -119,26 +143,27 @@ pytest tests/ -v
 | `tests/test_vocab_context.py` | 도메인 어휘 컨텍스트 |
 | `tests/test_projects_api.py` | 프로젝트 API 엔드포인트 |
 | `tests/test_confirm_api.py` | 확인 API 엔드포인트 |
+| `tests/test_upload_category.py` | 오디오 카테고리 파라미터 |
+| `tests/test_prompts.py` | LLM 프롬프트 템플릿 |
+| `tests/test_pin_auth.py` | PIN 인증 로직 |
+| `tests/test_pin_config.py` | PIN / SECRET_KEY 환경변수 로딩 |
 | `tests/test_integration.py` | 파이프라인 통합 테스트 |
 
 ### E2E 테스트 (실제 오디오 파일 필요)
 
 ```bash
-cd meetscribe
-
 # 테스트용 오디오 생성 (gtts 필요)
 pip install gtts
 python tests/generate_test_audio.py
 
 # E2E 실행 (서버 없이 직접 파이프라인 실행)
-MEETSCRIBE_E2E_AUDIO="C:/path/to/audio.m4a" python e2e_test.py
+MEETSCRIBE_E2E_AUDIO="C:/path/to/audio.m4a" python tests/e2e_test.py
 ```
 
 ### 서버 동작 테스트
 
 ```bash
-cd meetscribe
-python test_server.py
+python tests/test_server.py
 ```
 
 ---
@@ -149,36 +174,32 @@ python test_server.py
 meetscribe/
 ├── main.py              # FastAPI 서버 (업로드, 상태 폴링, 파이프라인 실행)
 ├── config.py            # 환경변수 로딩 및 검증
-├── run.bat              # Windows 실행 스크립트 (CUDA 경로 설정 포함)
-├── e2e_test.py          # 전사 E2E 테스트 (서버 없이 직접 실행)
-├── test_server.py       # 서버 동작 확인 스크립트
+├── run.bat              # Windows 실행 스크립트 (CUDA 경로 설정 + cloudflared 자동 시작)
+├── tunnel.py            # Cloudflare Tunnel 실행 및 QR 코드 출력
 ├── diagnose.py          # 환경 진단 스크립트
 ├── requirements.txt     # Python 패키지 목록
 ├── .env.example         # 환경변수 템플릿
 ├── .env                 # 실제 환경변수 (직접 생성, 커밋 금지)
+├── CLAUDE.md            # Claude Code 프로젝트 지침
+├── AGENTS.md            # AI 에이전트 협업 가이드
 ├── pipeline/
 │   ├── transcriber.py   # WhisperX 전사 + 화자 분리 (pyannote)
 │   ├── analyzer.py      # Gemini/GPT-4o-mini AI 분석
+│   ├── prompts.py       # 카테고리별 LLM 시스템 프롬프트
 │   ├── note_builder.py  # Obsidian 노트 마크다운 생성
 │   └── vault_writer.py  # Vault 파일 저장
 ├── static/
-│   └── index.html       # 웹 UI (드래그 앤 드롭 업로드)
-├── tests/               # 단위 테스트
-│   ├── generate_test_audio.py  # 테스트용 오디오 생성
-│   └── *.py             # 각 모듈별 테스트
+│   └── index.html       # 웹 UI (드래그 앤 드롭 업로드, PWA)
+├── tests/
+│   ├── e2e_test.py           # 전사 E2E 테스트 (서버 없이 직접 실행)
+│   ├── test_server.py        # 서버 동작 확인 스크립트
+│   ├── generate_test_audio.py # 테스트용 오디오 생성
+│   └── test_*.py            # 각 모듈별 단위 테스트
 ├── uploads/             # 임시 업로드 파일 (처리 후 자동 삭제)
-└── docs/                # MeetScribe 모듈별 문서
-```
-
-최상위 디렉토리:
-```
-06_Whisper_Obsidian/
-├── meetscribe/          # 메인 애플리케이션
-├── docs/
-│   ├── plans/           # 설계/계획 문서
-│   ├── CONTRIB.md       # 이 파일
-│   └── RUNBOOK.md       # 운영 런북
-└── AGENTS.md            # AI 에이전트 협업 가이드
+└── docs/                # 문서
+    ├── plans/           # 설계/계획 문서
+    ├── CONTRIB.md       # 이 파일
+    └── RUNBOOK.md       # 운영 런북
 ```
 
 ---
@@ -187,7 +208,7 @@ meetscribe/
 
 ### 코드 변경 시
 
-1. `meetscribe/.env`가 정상 설정되어 있는지 확인
+1. `.env`가 정상 설정되어 있는지 확인
 2. 변경 사항 구현
 3. 단위 테스트 실행: `pytest tests/ -v`
 4. (오디오 파일 있는 경우) E2E 테스트로 전체 파이프라인 검증
@@ -196,8 +217,8 @@ meetscribe/
 
 1. `config.py`에 변수 추가
 2. `.env.example`에 예시값과 주석 추가
-3. `MANUAL.md`의 환경변수 표 업데이트
-4. 이 파일(`CONTRIB.md`)의 환경변수 표 업데이트
+3. 이 파일(`CONTRIB.md`)의 환경변수 표 업데이트
+4. `RUNBOOK.md`의 설정 변경 절차 업데이트 (필요시)
 
 ### 새 의존성 추가 시
 

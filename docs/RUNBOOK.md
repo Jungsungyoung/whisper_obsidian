@@ -1,7 +1,7 @@
 # MeetScribe 운영 런북 (Runbook)
 
-> 소스 기준: `meetscribe/config.py`, `meetscribe/main.py`, `meetscribe/MANUAL.md`
-> 최종 업데이트: 2026-02-19
+> 소스 기준: `config.py`, `main.py`, `.env.example`
+> 최종 업데이트: 2026-02-20
 
 ---
 
@@ -13,6 +13,7 @@
 4. [자주 발생하는 문제 및 해결](#4-자주-발생하는-문제-및-해결)
 5. [롤백 절차](#5-롤백-절차)
 6. [설정 변경 절차](#6-설정-변경-절차)
+7. [모바일 접속 설정](#7-모바일-접속-설정)
 
 ---
 
@@ -59,6 +60,11 @@ pip install -r requirements.txt
 run.bat
 ```
 
+`run.bat` 동작:
+1. CUDA DLL 경로를 `PATH`에 추가
+2. `cloudflared`가 설치되어 있으면 `tunnel.py`를 백그라운드로 자동 시작 (QR 코드 출력)
+3. `uvicorn main:app --host 0.0.0.0 --port 8765` 실행
+
 **직접 실행**
 ```bash
 cd meetscribe
@@ -100,6 +106,12 @@ curl http://localhost:8765/
 curl http://localhost:8765/status/{job_id}
 ```
 
+**Job 상태 흐름:**
+```
+queued → transcribing → analyzing → review → confirmed → building → saving → done
+                                                                           └→ error / cancelled
+```
+
 ### 로그 확인 항목
 
 서버 콘솔에서 아래 로그를 확인합니다:
@@ -119,10 +131,10 @@ curl http://localhost:8765/status/{job_id}
 
 ```bash
 # uploads/ 폴더 확인
-ls meetscribe/uploads/
+ls uploads/
 
 # 수동 정리 (서버 종료 후)
-rm meetscribe/uploads/*
+rm uploads/*
 ```
 
 ---
@@ -217,6 +229,17 @@ curl https://api.openai.com/v1/models \
 
 ---
 
+### PIN 인증 관련
+
+#### PIN 입력 후 계속 로그인 화면으로 돌아옴
+- `SECRET_KEY`가 설정되지 않으면 서버 재시작 시마다 세션이 무효화됩니다.
+- **해결:** `.env`에 `SECRET_KEY=고정된-랜덤-문자열` 설정
+
+#### PIN을 잊어버린 경우
+- `.env`에서 `ACCESS_PIN` 값 확인 또는 변경 후 서버 재시작
+
+---
+
 ### 환경 진단
 
 문제 원인 파악이 어려운 경우:
@@ -231,20 +254,11 @@ python diagnose.py
 
 ### 코드 롤백
 
-MeetScribe는 로컬 실행 애플리케이션으로, 이전 버전 파일을 복원하면 됩니다.
-
 ```bash
-# git을 사용하는 경우
+# 특정 커밋으로 롤백
 git checkout <이전-커밋-해시>
 
-# 수동 복원의 경우
-# 이전 버전의 파일로 교체 후 서버 재시작
-```
-
-### 의존성 롤백
-
-```bash
-# 특정 버전으로 다운그레이드
+# 의존성도 함께 맞춰야 할 경우
 pip install -r requirements.txt --force-reinstall
 ```
 
@@ -261,16 +275,25 @@ pip install -r requirements.txt --force-reinstall
 ### Obsidian Vault 경로 변경
 
 ```env
-# .env 수정
 VAULT_PATH=C:\새로운\Vault\경로
-MEETINGS_FOLDER=새로운/폴더/경로
+```
+→ 서버 재시작 (또는 UI의 설정 모달에서 즉시 적용 가능)
+
+### 카테고리별 저장 폴더 변경
+
+```env
+MEETINGS_FOLDER=10_Calendar/13_Meetings
+INBOX_FOLDER=00_Inbox
+DAILY_FOLDER=10_Calendar/11_Daily
+AREAS_FOLDER=30_Areas
+PROJECTS_FOLDER=20_Projects
+RESOURCES_FOLDER=40_Resources
 ```
 → 서버 재시작
 
 ### Whisper 모델 변경
 
 ```env
-# .env 수정
 WHISPER_MODEL=small   # tiny / base / small / medium / large
 ```
 → 서버 재시작 (모델 최초 실행 시 자동 다운로드)
@@ -293,3 +316,36 @@ LLM_MODEL=gpt-4o-mini
 DOMAIN_VOCAB=함정, 선박, 전투체계, 소나, 레이더, 추진체계, 새어휘1, 새어휘2
 ```
 → 서버 재시작
+
+### UI에서 즉시 설정 변경
+
+서버 실행 중 **http://localhost:8765** → 설정(⚙) 아이콘 클릭 → 변경 후 저장.
+API 키, Vault 경로, 모델 등 대부분의 설정을 재시작 없이 적용할 수 있습니다.
+
+---
+
+## 7. 모바일 접속 설정
+
+### Cloudflare Tunnel을 통한 원격 접속
+
+1. [cloudflared 다운로드](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/) 후 PATH에 추가
+2. `run.bat` 실행 → 터널 자동 시작 및 QR 코드 출력
+3. 스마트폰으로 QR 코드 스캔 → `https://*.trycloudflare.com` 접속
+
+> 터널 URL은 매 실행마다 변경됩니다 (임시 터널). 고정 URL이 필요하면 Cloudflare 계정 연동 필요.
+
+### PIN 인증 설정 (원격 접속 시 필수 권장)
+
+```env
+ACCESS_PIN=1234
+SECRET_KEY=길고-예측-불가능한-랜덤-문자열
+```
+
+- `ACCESS_PIN` 미설정 시 인증 없이 누구나 접속 가능
+- `SECRET_KEY` 고정 설정 시 서버 재시작 후에도 로그인 세션 유지
+
+### PWA 설치 (홈 화면 추가)
+
+모바일 브라우저에서 접속 후:
+- **iOS Safari:** 공유 버튼 → "홈 화면에 추가"
+- **Android Chrome:** 주소창 → "앱 설치" 또는 메뉴 → "홈 화면에 추가"

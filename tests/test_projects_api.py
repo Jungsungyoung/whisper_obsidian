@@ -1,8 +1,6 @@
 import textwrap
 from pathlib import Path
 
-import pytest
-
 
 def _make_vault(tmp_path: Path) -> Path:
     """테스트용 가짜 Vault 구조 생성."""

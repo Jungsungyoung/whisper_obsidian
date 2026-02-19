@@ -1,7 +1,4 @@
 """화자 이름 매핑 로직 테스트"""
-import pytest
-from fastapi import HTTPException
-
 
 def test_confirm_stores_speaker_map():
     import main

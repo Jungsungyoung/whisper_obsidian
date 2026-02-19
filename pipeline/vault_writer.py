@@ -1,7 +1,7 @@
 from pathlib import Path
 from urllib.parse import quote
 import config as _cfg
-from pipeline.note_builder import NoteData, get_filenames, get_note_filenames
+from pipeline.note_builder import NoteData, get_note_filenames
 
 
 class VaultWriter:

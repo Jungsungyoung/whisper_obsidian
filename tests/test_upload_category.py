@@ -2,9 +2,7 @@
 category 필드 플러밍 테스트
 함수를 직접 호출하는 방식으로 검증한다 (TestClient 버전 호환 이슈 우회).
 """
-import pytest
 import inspect
-import fastapi
 
 
 def test_upload_endpoint_accepts_category_param():
@@ -19,9 +17,6 @@ def test_upload_category_default_is_meeting():
     from main import upload
     sig = inspect.signature(upload)
     param = sig.parameters["category"]
-    default = param.default
-    # FastAPI Form 기본값은 Depends/Form 객체이므로 기본값 체크는 소스에서 확인
-    # 대신 함수가 정상 로드되는지만 검증
     assert param is not None
 
 

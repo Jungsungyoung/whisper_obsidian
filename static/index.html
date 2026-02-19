@@ -4,165 +4,805 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>MeetScribe</title>
+  <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      background: #1a1a2e;
-      color: #e0e0e0;
-      min-height: 100vh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
+    :root {
+      --bg: #f4f4f2;
+      --surface: #ffffff;
+      --surface-2: #fafaf9;
+      --border: #e2e2e0;
+      --border-strong: #c4c4c2;
+      --text: #1a1a1a;
+      --text-2: #575757;
+      --text-3: #9c9c9c;
+      --accent: #2563eb;
+      --accent-bg: #eff6ff;
+      --accent-border: #bfdbfe;
+      --success: #15803d;
+      --success-bg: #f0fdf4;
+      --success-border: #bbf7d0;
+      --danger: #dc2626;
+      --danger-bg: #fef2f2;
+      --danger-border: #fecaca;
+      --warn-bg: #fffbeb;
+      --warn-border: #fde68a;
+      --warn-text: #92400e;
+      --warn-dot: #d97706;
+      --radius: 8px;
+      --radius-lg: 12px;
+      --shadow-sm: 0 1px 2px rgba(0,0,0,0.05);
+      --font: 'Pretendard Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
     }
-    .card {
-      width: 460px;
-      background: #16213e;
-      border-radius: 16px;
-      padding: 32px;
-      box-shadow: 0 8px 40px rgba(0,0,0,0.5);
-    }
-    h1 { font-size: 1.6rem; color: #7c83fd; margin-bottom: 4px; }
-    .sub { font-size: 0.82rem; color: #666; margin-bottom: 24px; }
 
-    /* drop zone */
-    #drop-zone {
-      border: 2px dashed #7c83fd44;
-      border-radius: 12px;
-      padding: 28px;
-      text-align: center;
-      cursor: pointer;
-      transition: border-color .15s, background .15s;
-      margin-bottom: 18px;
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: var(--font);
+      font-size: 14px;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      -webkit-font-smoothing: antialiased;
     }
-    #drop-zone.over { border-color: #7c83fd; background: #7c83fd11; }
-    #drop-zone .ico { font-size: 2rem; margin-bottom: 6px; }
-    #drop-zone .hint { font-size: 0.78rem; color: #555; margin-top: 4px; }
-    #fname { font-size: 0.82rem; color: #7c83fd; margin-top: 6px; min-height: 1em; }
+
+    /* ── HEADER ── */
+    .app-header {
+      position: sticky; top: 0; z-index: 50;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      height: 52px;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 24px;
+    }
+    .header-left { display: flex; align-items: center; gap: 10px; }
+    .logo-mark {
+      width: 28px; height: 28px;
+      background: var(--accent); border-radius: 6px;
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    }
+    .logo-mark svg { color: #fff; }
+    .logo-text { font-weight: 700; font-size: 1rem; letter-spacing: -0.02em; }
+    .logo-sep { width: 1px; height: 16px; background: var(--border); margin: 0 4px; }
+    .logo-sub { font-size: 0.75rem; color: var(--text-3); }
+    @media (max-width: 580px) { .logo-sep, .logo-sub { display: none; } }
+
+    #settings-btn {
+      display: flex; align-items: center; gap: 6px;
+      padding: 6px 12px;
+      background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+      color: var(--text-2); font-family: var(--font); font-size: 0.8rem;
+      cursor: pointer; transition: all .15s;
+    }
+    #settings-btn:hover { border-color: var(--border-strong); color: var(--text); background: var(--surface-2); }
+
+    /* ── LAYOUT ── */
+    .main {
+      max-width: 960px; margin: 0 auto;
+      padding: 24px 20px;
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: 16px; align-items: start;
+    }
+    @media (max-width: 720px) { .main { grid-template-columns: 1fr; } }
+
+    /* ── CARD ── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-sm);
+      overflow: hidden;
+    }
+    .card-body { padding: 20px; }
+    .card-body + .card-body { border-top: 1px solid var(--border); }
+
+    /* ── DROP ZONE ── */
+    #drop-zone {
+      border: 1.5px dashed var(--border-strong); border-radius: var(--radius);
+      padding: 28px 20px; text-align: center; cursor: pointer;
+      background: var(--surface-2); margin-bottom: 14px;
+      transition: all .2s;
+    }
+    #drop-zone:hover, #drop-zone.over {
+      border-color: var(--accent); background: var(--accent-bg);
+    }
+    #drop-zone:hover .dz-icon, #drop-zone.over .dz-icon { color: var(--accent); }
+    .dz-icon { margin: 0 auto 10px; color: var(--text-3); width: 36px; height: 36px; transition: color .2s; }
+    .dz-text { font-size: 0.875rem; color: var(--text-2); font-weight: 500; }
+    .dz-hint { font-size: 0.73rem; color: var(--text-3); margin-top: 4px; }
+    #fname { font-size: 0.78rem; color: var(--accent); margin-top: 8px; font-weight: 500; min-height: 1em; word-break: break-all; }
     input[type=file] { display: none; }
 
-    /* fields */
-    .field { margin-bottom: 14px; }
-    label { display: block; font-size: 0.78rem; color: #888; margin-bottom: 5px; }
-    input[type=text] {
-      width: 100%; padding: 9px 12px;
-      background: #0f3460; border: 1px solid #ffffff11; border-radius: 8px;
-      color: #e0e0e0; font-size: 0.88rem; outline: none;
-      transition: border-color .15s;
-    }
-    input[type=text]:focus { border-color: #7c83fd; }
-
-    /* button */
-    #btn {
-      width: 100%; padding: 13px;
-      background: #7c83fd; color: #fff; border: none; border-radius: 10px;
-      font-size: 0.95rem; font-weight: 600; cursor: pointer;
-      transition: background .15s; margin-top: 4px;
-    }
-    #btn:hover:not(:disabled) { background: #6a71e0; }
-    #btn:disabled { background: #333; color: #666; cursor: not-allowed; }
-
-    /* progress */
-    #progress { margin-top: 22px; display: none; }
-    .step {
+    /* ── OR DIVIDER ── */
+    .or-divider {
       display: flex; align-items: center; gap: 10px;
-      padding: 7px 0; font-size: 0.88rem; color: #555;
-      border-bottom: 1px solid #ffffff08;
+      margin: 12px 0; font-size: 0.72rem; color: var(--text-3);
     }
-    .step:last-child { border-bottom: none; }
-    .step.active { color: #7c83fd; }
-    .step.done { color: #4caf50; }
-    .step .ico { width: 18px; text-align: center; flex-shrink: 0; }
+    .or-divider::before, .or-divider::after { content: ''; flex: 1; height: 1px; background: var(--border); }
 
-    /* progress bar */
-    #progress-bar-wrap {
-      margin-top: 14px; background: #0f3460;
-      border-radius: 99px; height: 6px; overflow: hidden;
+    /* ── RECORDING ── */
+    #rec-start-btn {
+      width: 100%; padding: 9px;
+      background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+      color: var(--text-2); font-family: var(--font); font-size: 0.8rem;
+      cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 7px;
+      transition: all .15s;
     }
-    #progress-bar {
-      height: 100%; width: 0%; background: #7c83fd;
-      border-radius: 99px; transition: width 0.4s ease;
+    #rec-start-btn:hover:not(:disabled) { border-color: var(--danger-border); color: var(--danger); background: var(--danger-bg); }
+    #rec-start-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .rec-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--danger); flex-shrink: 0; }
+
+    #rec-active {
+      display: none; align-items: center; gap: 10px;
+      padding: 10px 14px; margin-top: 10px;
+      background: var(--danger-bg); border: 1px solid var(--danger-border); border-radius: var(--radius);
     }
+    @keyframes pulse-dot { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.5;transform:scale(1.3)} }
+    .pulse-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--danger); flex-shrink: 0; animation: pulse-dot 1s ease-in-out infinite; }
+    #rec-timer { font-family: var(--font-mono); font-size: 0.82rem; color: var(--danger); flex: 1; }
+    #rec-stop-btn {
+      padding: 5px 12px; background: var(--surface);
+      border: 1px solid var(--danger-border); border-radius: 6px;
+      color: var(--danger); font-family: var(--font); font-size: 0.75rem; cursor: pointer; transition: background .15s;
+    }
+    #rec-stop-btn:hover { background: #fff1f2; }
+
+    #rec-confirm {
+      display: none; align-items: center; gap: 8px;
+      padding: 10px 14px; margin-top: 10px; font-size: 0.8rem;
+      background: var(--success-bg); border: 1px solid var(--success-border); border-radius: var(--radius);
+    }
+    #rec-confirm-label { color: var(--success); flex: 1; font-weight: 500; }
+    #rec-confirm-ok {
+      padding: 5px 12px; background: var(--success-bg);
+      border: 1px solid var(--success-border); border-radius: 6px;
+      color: var(--success); font-family: var(--font); font-size: 0.75rem; font-weight: 500; cursor: pointer; transition: background .15s;
+    }
+    #rec-confirm-ok:hover { background: #dcfce7; }
+    #rec-confirm-cancel {
+      padding: 5px 10px; background: none;
+      border: 1px solid var(--border); border-radius: 6px;
+      color: var(--text-3); font-family: var(--font); font-size: 0.75rem; cursor: pointer; transition: all .15s;
+    }
+    #rec-confirm-cancel:hover { color: var(--text-2); border-color: var(--border-strong); }
+
+    /* ── FIELDS ── */
+    .field { margin-bottom: 12px; }
+    .fields-start { margin-top: 16px; }
+    label { display: block; font-size: 0.78rem; font-weight: 500; color: var(--text-2); margin-bottom: 5px; }
+    label .opt { font-weight: 400; color: var(--text-3); }
+    input[type=text], input[type=password], select, textarea {
+      width: 100%; padding: 8px 11px;
+      background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+      color: var(--text); font-size: 0.875rem; font-family: var(--font);
+      outline: none; transition: border-color .15s, box-shadow .15s;
+    }
+    input:focus, select:focus, textarea:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(37,99,235,.1);
+    }
+    ::placeholder { color: var(--text-3); }
+    select option { background: var(--surface); }
+    textarea { resize: vertical; line-height: 1.55; min-height: 52px; }
+
+    /* ── BUTTONS ── */
+    #btn {
+      width: 100%; padding: 11px;
+      background: var(--accent); color: #fff; border: none; border-radius: var(--radius);
+      font-family: var(--font); font-size: 0.875rem; font-weight: 600;
+      cursor: pointer; transition: all .15s; margin-top: 4px; letter-spacing: -0.01em;
+    }
+    #btn:hover:not(:disabled) { background: #1d4ed8; box-shadow: 0 4px 12px rgba(37,99,235,.3); transform: translateY(-1px); }
+    #btn:active { transform: translateY(0); }
+    #btn:disabled { background: var(--border); color: var(--text-3); cursor: not-allowed; box-shadow: none; transform: none; }
+
+    #cancel-btn {
+      width: 100%; padding: 9px; margin-top: 8px;
+      background: none; border: 1px solid var(--border); border-radius: var(--radius);
+      color: var(--text-2); font-family: var(--font); font-size: 0.8rem;
+      cursor: pointer; transition: all .15s; display: none;
+    }
+    #cancel-btn:hover { border-color: var(--danger-border); color: var(--danger); background: var(--danger-bg); }
+
+    /* ── ERROR ── */
+    #err {
+      margin-top: 12px; padding: 10px 12px;
+      background: var(--danger-bg); border: 1px solid var(--danger-border); border-radius: var(--radius);
+      font-size: 0.8rem; color: var(--danger); display: none; line-height: 1.5;
+    }
+
+    /* ── PROGRESS ── */
+    #progress { display: none; }
+    .steps { display: flex; flex-direction: column; }
+    .step {
+      display: flex; align-items: center; gap: 12px;
+      padding: 8px 0; font-size: 0.83rem; color: var(--text-3);
+      position: relative;
+    }
+    .step + .step::before {
+      content: ''; position: absolute; left: 9px; top: 0;
+      width: 1px; height: 9px; background: var(--border);
+    }
+    .step.done + .step::before, .step.active + .step::before { background: var(--accent); }
+
+    .step .ico {
+      width: 20px; height: 20px; border-radius: 50%;
+      border: 1.5px solid var(--border-strong);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.6rem; flex-shrink: 0;
+      background: var(--surface); color: transparent;
+      transition: all .25s;
+    }
+    .step.active .ico { border-color: var(--accent); background: var(--accent); color: #fff; }
+    .step.done .ico { border-color: var(--success); background: var(--success); color: #fff; }
+    .step.active { color: var(--text); font-weight: 500; }
+    .step.done { color: var(--text-2); }
+    .step-label { flex: 1; }
+
+    #progress-bar-wrap { margin-top: 14px; background: var(--border); border-radius: 99px; height: 3px; overflow: hidden; }
+    #progress-bar { height: 100%; width: 0%; background: var(--accent); border-radius: 99px; transition: width .5s ease; }
+
     #progress-detail {
-      margin-top: 8px; font-size: 0.75rem; color: #666;
+      margin-top: 8px; font-size: 0.72rem; color: var(--text-3);
       min-height: 1.2em; display: flex; justify-content: space-between;
     }
-    #progress-detail .detail-text { color: #7c83fd88; }
-    #progress-detail .elapsed-text { color: #444; }
+    #progress-detail .detail-text { color: var(--accent); }
 
-    /* result */
-    #result { margin-top: 18px; display: none; }
-    .result-box { background: #0f3460; border-radius: 10px; padding: 16px; }
-    .result-box p { font-size: 0.82rem; color: #aaa; margin-bottom: 10px; }
+    /* ── LOG PANEL ── */
+    #log-panel {
+      margin-top: 12px;
+      background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius);
+      padding: 10px 12px; height: 150px; overflow-y: auto;
+      font-family: var(--font-mono); font-size: 0.7rem; display: none;
+    }
+    #log-panel::-webkit-scrollbar { width: 4px; }
+    #log-panel::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+    .log-line { color: var(--text-3); line-height: 1.8; white-space: pre-wrap; }
+    .log-line.latest { color: var(--text-2); }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+    .cursor { display: inline-block; width: 5px; height: 11px; background: var(--accent); margin-left: 3px; vertical-align: middle; animation: blink 1s step-start infinite; }
+
+    /* ── RIGHT PLACEHOLDER ── */
+    #right-placeholder {
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      min-height: 240px; gap: 10px;
+      color: var(--text-3); font-size: 0.8rem;
+      background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-sm);
+    }
+    .ph-icon { color: var(--border-strong); }
+
+    /* ── REVIEW PANEL ── */
+    #review-panel {
+      display: none; background: var(--surface);
+      border: 1px solid var(--border); border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-sm); overflow: hidden;
+    }
+    .review-header {
+      padding: 12px 20px; background: var(--warn-bg); border-bottom: 1px solid var(--warn-border);
+      display: flex; align-items: center; gap: 8px;
+    }
+    .review-badge { width: 6px; height: 6px; border-radius: 50%; background: var(--warn-dot); flex-shrink: 0; animation: blink 2s ease-in-out infinite; }
+    .review-title { font-size: 0.8rem; font-weight: 600; color: var(--warn-text); }
+    .review-body { padding: 16px 20px; }
+    .rv-field { margin-bottom: 12px; }
+    .rv-field label { color: var(--text-2); }
+    .rv-field textarea { font-size: 0.8rem; min-height: 48px; background: var(--surface-2); }
+
+    #rv-speakers { margin-bottom: 4px; }
+    .rv-speaker-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+    .rv-speaker-label { font-family: var(--font-mono); font-size: 0.72rem; color: var(--text-3); width: 72px; flex-shrink: 0; }
+    .rv-speaker-arrow { color: var(--border-strong); font-size: 0.75rem; }
+    .rv-speaker-input {
+      flex: 1; padding: 5px 9px;
+      background: var(--surface); border: 1px solid var(--border); border-radius: 6px;
+      color: var(--text); font-size: 0.8rem; font-family: var(--font); outline: none; transition: border-color .15s, box-shadow .15s;
+    }
+    .rv-speaker-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(37,99,235,.1); }
+
+    .rv-actions { display: flex; gap: 8px; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border); }
+    #rv-save-btn {
+      flex: 1; padding: 9px;
+      background: var(--accent); border: none; border-radius: var(--radius);
+      color: #fff; font-family: var(--font); font-size: 0.875rem; font-weight: 600;
+      cursor: pointer; transition: all .15s;
+    }
+    #rv-save-btn:hover:not(:disabled) { background: #1d4ed8; }
+    #rv-save-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    #rv-cancel-btn {
+      padding: 9px 16px; background: none;
+      border: 1px solid var(--border); border-radius: var(--radius);
+      color: var(--text-2); font-family: var(--font); font-size: 0.8rem;
+      cursor: pointer; transition: all .15s;
+    }
+    #rv-cancel-btn:hover { border-color: var(--danger-border); color: var(--danger); background: var(--danger-bg); }
+
+    /* ── RESULT ── */
+    #result { display: none; }
+    .result-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); overflow: hidden;
+    }
+    .result-header {
+      padding: 12px 20px; background: var(--success-bg); border-bottom: 1px solid var(--success-border);
+      display: flex; align-items: center; gap: 8px;
+      font-size: 0.8rem; font-weight: 600; color: var(--success);
+    }
+    .result-body { padding: 16px 20px; }
+    .result-hint { font-size: 0.78rem; color: var(--text-3); margin-bottom: 12px; }
     .obs-btn {
-      display: block; width: 100%; padding: 10px;
-      background: #7c3aed; color: #fff; border: none; border-radius: 8px;
-      font-size: 0.88rem; text-align: center; text-decoration: none; cursor: pointer;
-      margin-bottom: 8px; transition: background .15s;
+      display: flex; align-items: center; gap: 10px;
+      width: 100%; padding: 11px 14px;
+      background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius);
+      color: var(--text); font-size: 0.83rem; font-weight: 500;
+      text-decoration: none; font-family: var(--font);
+      margin-bottom: 8px; cursor: pointer; transition: all .15s;
     }
     .obs-btn:last-child { margin-bottom: 0; }
-    .obs-btn:hover { background: #6d28d9; }
-
-    /* error */
-    #err {
-      margin-top: 14px; padding: 12px;
-      background: #3f0000; border: 1px solid #ff4444; border-radius: 8px;
-      font-size: 0.82rem; color: #ff8080; display: none;
+    .obs-btn:hover { border-color: var(--accent-border); background: var(--accent-bg); color: var(--accent); }
+    .obs-btn-icon {
+      width: 28px; height: 28px; border-radius: 6px; background: var(--border);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.82rem; flex-shrink: 0; transition: background .15s;
     }
+    .obs-btn:hover .obs-btn-icon { background: var(--accent-border); }
+
+    /* ── SETTINGS MODAL ── */
+    #modal-overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,0.35); z-index: 200;
+      align-items: center; justify-content: center; backdrop-filter: blur(2px);
+    }
+    #modal-overlay.open { display: flex; }
+    .modal {
+      background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg);
+      width: 460px; max-height: 90vh; overflow-y: auto;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.12), 0 8px 20px rgba(0,0,0,0.06);
+    }
+    .modal::-webkit-scrollbar { width: 4px; }
+    .modal::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+    .modal-header {
+      position: sticky; top: 0; background: var(--surface);
+      padding: 16px 20px; border-bottom: 1px solid var(--border);
+      display: flex; justify-content: space-between; align-items: center; z-index: 1;
+    }
+    .modal-title { font-weight: 600; font-size: 0.9rem; }
+    #modal-close {
+      width: 28px; height: 28px; display: flex; align-items: center; justify-content: center;
+      background: none; border: 1px solid var(--border); border-radius: 6px;
+      cursor: pointer; color: var(--text-3); font-size: 0.75rem; transition: all .15s;
+    }
+    #modal-close:hover { border-color: var(--border-strong); color: var(--text-2); background: var(--surface-2); }
+    .modal-body { padding: 20px; }
+    .modal-section { margin-bottom: 22px; }
+    .modal-section:last-child { margin-bottom: 0; }
+    .modal-section-title {
+      font-size: 0.7rem; font-weight: 600; color: var(--text-3);
+      text-transform: uppercase; letter-spacing: 0.06em;
+      margin-bottom: 10px; padding-bottom: 6px; border-bottom: 1px solid var(--border);
+    }
+    .modal-field { margin-bottom: 10px; }
+    .modal-field textarea { min-height: 72px; }
+    .modal-footer { padding: 16px 20px; border-top: 1px solid var(--border); background: var(--surface-2); }
+    #save-btn {
+      width: 100%; padding: 10px;
+      background: var(--accent); color: #fff; border: none; border-radius: var(--radius);
+      font-family: var(--font); font-size: 0.875rem; font-weight: 600;
+      cursor: pointer; transition: all .15s;
+    }
+    #save-btn:hover { background: #1d4ed8; }
+    #save-msg { font-size: 0.75rem; color: var(--success); text-align: center; margin-top: 8px; min-height: 1em; }
+
+    /* ── CATEGORY TABS ── */
+    .category-tabs {
+      display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 14px;
+    }
+    .cat-tab {
+      padding: 5px 12px; border-radius: 20px; border: 1px solid var(--border);
+      background: var(--surface-2); color: var(--text-2);
+      font-family: var(--font); font-size: 0.78rem; cursor: pointer;
+      transition: all .15s;
+    }
+    .cat-tab:hover { border-color: var(--border-strong); color: var(--text); }
+    .cat-tab.active {
+      background: var(--accent); border-color: var(--accent); color: #fff;
+    }
+    /* ── CATEGORY FORM GROUPS ── */
+    .cat-fields { display: none; }
+    .cat-fields.visible { display: block; }
   </style>
 </head>
 <body>
-<div class="card">
-  <h1>MeetScribe</h1>
-  <p class="sub">회의 녹음 → 자동 전사 → Obsidian 노트</p>
 
-  <div id="drop-zone" role="button" tabindex="0" aria-label="파일 업로드 영역"
-       onclick="document.getElementById('fi').click()"
-       onkeydown="if(event.key==='Enter')document.getElementById('fi').click()">
-    <div class="ico">🎙️</div>
-    <div>파일을 드래그하거나 클릭하세요</div>
-    <div class="hint">mp3 · wav · m4a · mp4</div>
-    <div id="fname"></div>
-  </div>
-  <input type="file" id="fi" accept=".mp3,.wav,.m4a,.mp4,.webm,.ogg">
-
-  <div class="field">
-    <label for="title">회의 제목</label>
-    <input type="text" id="title" placeholder="비워두면 파일명 사용">
-  </div>
-  <div class="field">
-    <label for="project">프로젝트 (선택)</label>
-    <input type="text" id="project" placeholder="예: [[USV Project Dashboard]]">
-  </div>
-
-  <button id="btn" disabled>분석 시작</button>
-
-  <div id="progress">
-    <div class="step" id="s-upload"><span class="ico">⬜</span>업로드</div>
-    <div class="step" id="s-trans"><span class="ico">⬜</span>Whisper 전사</div>
-    <div class="step" id="s-ai"><span class="ico">⬜</span>Gemini AI 분석</div>
-    <div class="step" id="s-save"><span class="ico">⬜</span>Vault 저장</div>
-    <div id="progress-bar-wrap">
-      <div id="progress-bar"></div>
+<!-- 설정 모달 -->
+<div id="modal-overlay">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">설정</span>
+      <button id="modal-close">✕</button>
     </div>
-    <div id="progress-detail">
-      <span class="detail-text" id="detail-text"></span>
-      <span class="elapsed-text" id="elapsed-text"></span>
+    <div class="modal-body">
+      <div class="modal-section">
+        <div class="modal-section-title">전사 모델</div>
+        <div class="modal-field">
+          <label for="s-whisper">Whisper 모델</label>
+          <select id="s-whisper">
+            <option value="tiny">tiny — 가장 빠름, 낮은 정확도</option>
+            <option value="base">base — 빠름, 보통 정확도</option>
+            <option value="small">small — 보통, 좋은 정확도</option>
+            <option value="medium">medium — 느림, 높은 정확도</option>
+            <option value="large">large — 가장 느림, 최고 정확도</option>
+          </select>
+        </div>
+      </div>
+      <div class="modal-section">
+        <div class="modal-section-title">API 키</div>
+        <div class="modal-field">
+          <label for="s-gemini">Gemini API 키</label>
+          <input type="password" id="s-gemini" placeholder="AIza... (비워두면 변경 안 함)">
+        </div>
+        <div class="modal-field">
+          <label for="s-openai">OpenAI API 키</label>
+          <input type="password" id="s-openai" placeholder="sk-... (비워두면 변경 안 함)">
+        </div>
+        <div class="modal-field">
+          <label for="s-hf">HuggingFace 토큰 <span class="opt">(화자 분리용)</span></label>
+          <input type="password" id="s-hf" placeholder="hf_... (비워두면 변경 안 함)">
+        </div>
+      </div>
+      <div class="modal-section">
+        <div class="modal-section-title">Obsidian Vault</div>
+        <div class="modal-field">
+          <label for="s-vault">Vault 경로</label>
+          <input type="text" id="s-vault" placeholder="C:\Users\...\Obsidian Vault">
+        </div>
+        <div class="modal-field">
+          <label for="s-folder">회의 노트 저장 폴더</label>
+          <input type="text" id="s-folder" placeholder="10_Calendar/13_Meetings">
+        </div>
+      </div>
+      <div class="modal-section">
+        <div class="modal-section-title">카테고리별 저장 폴더</div>
+        <div class="modal-field">
+          <label for="s-inbox-folder">보이스 메모 폴더</label>
+          <input type="text" id="s-inbox-folder" placeholder="00_Inbox">
+        </div>
+        <div class="modal-field">
+          <label for="s-daily-folder">데일리 폴더</label>
+          <input type="text" id="s-daily-folder" placeholder="10_Calendar/11_Daily">
+        </div>
+        <div class="modal-field">
+          <label for="s-areas-folder">강의 폴더</label>
+          <input type="text" id="s-areas-folder" placeholder="30_Areas">
+        </div>
+        <div class="modal-field">
+          <label for="s-projects-folder">프로젝트 논의 기본 폴더</label>
+          <input type="text" id="s-projects-folder" placeholder="20_Projects">
+        </div>
+        <div class="modal-field">
+          <label for="s-resources-folder">레퍼런스 폴더</label>
+          <input type="text" id="s-resources-folder" placeholder="40_Resources">
+        </div>
+      </div>
+      <div class="modal-section">
+        <div class="modal-section-title">전사 정확도</div>
+        <div class="modal-field">
+          <label for="s-domain-vocab">도메인 용어 힌트</label>
+          <textarea id="s-domain-vocab" rows="3" placeholder="함정, 선박, 전투체계, 소나, 레이더, ..."></textarea>
+        </div>
+      </div>
     </div>
-  </div>
-
-  <div id="err"></div>
-
-  <div id="result">
-    <div class="result-box">
-      <p>완료! Obsidian에서 열기:</p>
-      <a id="lnk-meeting" class="obs-btn" href="#">📝 회의 노트 열기</a>
-      <a id="lnk-transcript" class="obs-btn" href="#">📄 전사 노트 열기</a>
+    <div class="modal-footer">
+      <button id="save-btn">저장</button>
+      <div id="save-msg"></div>
     </div>
   </div>
 </div>
 
+<!-- 헤더 -->
+<header class="app-header">
+  <div class="header-left">
+    <div class="logo-mark">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+        <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/>
+        <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+        <line x1="12" y1="19" x2="12" y2="23"/>
+        <line x1="8" y1="23" x2="16" y2="23"/>
+      </svg>
+    </div>
+    <span class="logo-text">MeetScribe</span>
+    <div class="logo-sep"></div>
+    <span class="logo-sub">회의 녹음 → 전사 → Obsidian 노트</span>
+  </div>
+  <button id="settings-btn" title="설정">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <circle cx="12" cy="12" r="3"/>
+      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+    </svg>
+    설정
+  </button>
+</header>
+
+<!-- 메인 -->
+<main class="main">
+  <!-- 왼쪽: 입력 + 진행 -->
+  <div class="col-left">
+    <div class="card">
+      <div class="card-body">
+        <!-- 드롭존 -->
+        <div id="drop-zone" role="button" tabindex="0" aria-label="파일 업로드 영역"
+             onclick="document.getElementById('fi').click()"
+             onkeydown="if(event.key==='Enter')document.getElementById('fi').click()">
+          <div class="dz-icon">
+            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="16 16 12 12 8 16"/>
+              <line x1="12" y1="12" x2="12" y2="21"/>
+              <path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/>
+            </svg>
+          </div>
+          <div class="dz-text">파일을 드래그하거나 클릭하세요</div>
+          <div class="dz-hint">MP3 · WAV · M4A · MP4 · WEBM · OGG</div>
+          <div id="fname"></div>
+        </div>
+
+        <div class="or-divider">또는</div>
+
+        <!-- 녹음 -->
+        <div id="rec-idle">
+          <button id="rec-start-btn" type="button">
+            <span class="rec-dot"></span>마이크로 녹음 시작
+          </button>
+        </div>
+        <div id="rec-active">
+          <span class="pulse-dot"></span>
+          <span id="rec-timer">00:00</span>
+          <button id="rec-stop-btn" type="button">■ 중단</button>
+        </div>
+        <div id="rec-confirm">
+          <span id="rec-confirm-label"></span>
+          <button id="rec-confirm-ok" type="button">▶ 전사 시작</button>
+          <button id="rec-confirm-cancel" type="button">✕ 재녹음</button>
+        </div>
+
+        <input type="file" id="fi" accept=".mp3,.wav,.m4a,.mp4,.webm,.ogg">
+
+        <!-- 카테고리 선택 -->
+        <div class="category-tabs" style="margin-top:16px">
+          <button class="cat-tab active" data-cat="meeting">회의</button>
+          <button class="cat-tab" data-cat="voice_memo">보이스 메모</button>
+          <button class="cat-tab" data-cat="daily">데일리</button>
+          <button class="cat-tab" data-cat="lecture">강의/세미나</button>
+          <button class="cat-tab" data-cat="discussion">프로젝트 논의</button>
+          <button class="cat-tab" data-cat="reference">레퍼런스</button>
+        </div>
+
+        <!-- 회의 / 프로젝트 논의 공통 필드 -->
+        <div class="cat-fields visible" id="fields-meeting-like">
+          <div class="field">
+            <label for="title" id="title-label">회의 제목</label>
+            <input type="text" id="title" placeholder="비워두면 파일명 사용">
+          </div>
+          <div class="field" id="project-field">
+            <label for="project">프로젝트</label>
+            <select id="project"><option value="">선택 안 함</option></select>
+          </div>
+          <div class="field">
+            <label for="context" id="context-label">회의 맥락 <span class="opt">(전사·분석 정확도 향상)</span></label>
+            <textarea id="context" rows="2" placeholder="예: 레이더 시스템 설계 검토, 전투체계 통합 일정 논의"></textarea>
+          </div>
+        </div>
+
+        <!-- 보이스 메모 필드 -->
+        <div class="cat-fields" id="fields-voice-memo">
+          <div class="field">
+            <label for="vm-title">메모 제목</label>
+            <input type="text" id="vm-title" placeholder="비워두면 파일명 사용">
+          </div>
+          <div class="field">
+            <label for="vm-context">메모 맥락 <span class="opt">(선택)</span></label>
+            <textarea id="vm-context" rows="2" placeholder="예: 퇴근길 아이디어 메모"></textarea>
+          </div>
+        </div>
+
+        <!-- 데일리 업무일지 필드 -->
+        <div class="cat-fields" id="fields-daily">
+          <div class="field">
+            <label for="daily-context">추가 메모 <span class="opt">(선택)</span></label>
+            <textarea id="daily-context" rows="2" placeholder="예: 오전 미팅 내용 포함됨"></textarea>
+          </div>
+        </div>
+
+        <!-- 강의/세미나 필드 -->
+        <div class="cat-fields" id="fields-lecture">
+          <div class="field">
+            <label for="lec-title">강의 제목</label>
+            <input type="text" id="lec-title" placeholder="강의명 또는 주제">
+          </div>
+          <div class="field">
+            <label for="lec-source">강사/출처 <span class="opt">(선택)</span></label>
+            <input type="text" id="lec-source" placeholder="예: 김철수 교수, Coursera">
+          </div>
+          <div class="field">
+            <label for="lec-context">학습 맥락 <span class="opt">(선택)</span></label>
+            <textarea id="lec-context" rows="2" placeholder="예: 제어 시스템 스터디 3주차"></textarea>
+          </div>
+        </div>
+
+        <!-- 레퍼런스 리뷰 필드 -->
+        <div class="cat-fields" id="fields-reference">
+          <div class="field">
+            <label for="ref-title">레퍼런스 제목</label>
+            <input type="text" id="ref-title" placeholder="논문명 또는 문서명">
+          </div>
+          <div class="field">
+            <label for="ref-source">출처 <span class="opt">(선택)</span></label>
+            <input type="text" id="ref-source" placeholder="예: IEEE, 사내 기술 문서">
+          </div>
+          <div class="field">
+            <label for="ref-context">검토 목적 <span class="opt">(선택)</span></label>
+            <textarea id="ref-context" rows="2" placeholder="예: USV 항법 알고리즘 개선 참고용"></textarea>
+          </div>
+        </div>
+
+        <button id="btn" disabled>분석 시작</button>
+        <button id="cancel-btn">■ 처리 중단</button>
+        <div id="err"></div>
+      </div>
+
+      <!-- 진행 섹션 -->
+      <div id="progress" class="card-body">
+        <div class="steps">
+          <div class="step" id="s-upload">
+            <div class="ico"></div><span class="step-label">업로드</span>
+          </div>
+          <div class="step" id="s-trans">
+            <div class="ico"></div><span class="step-label">Whisper 전사</span>
+          </div>
+          <div class="step" id="s-ai">
+            <div class="ico"></div><span class="step-label">AI 분석</span>
+          </div>
+          <div class="step" id="s-save">
+            <div class="ico"></div><span class="step-label">Vault 저장</span>
+          </div>
+        </div>
+        <div id="progress-bar-wrap"><div id="progress-bar"></div></div>
+        <div id="progress-detail">
+          <span class="detail-text" id="detail-text"></span>
+          <span class="elapsed-text" id="elapsed-text"></span>
+        </div>
+        <div id="log-panel"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 오른쪽: 검토/결과 -->
+  <div class="col-right">
+    <div id="right-placeholder">
+      <div class="ph-icon">
+        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.25">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+          <polyline points="14 2 14 8 20 8"/>
+          <line x1="16" y1="13" x2="8" y2="13"/>
+          <line x1="16" y1="17" x2="8" y2="17"/>
+        </svg>
+      </div>
+      분석 완료 후 결과가 표시됩니다
+    </div>
+
+    <div id="review-panel">
+      <div class="review-header">
+        <div class="review-badge"></div>
+        <span class="review-title">분석 결과 검토 — 저장 전 내용을 확인하세요</span>
+      </div>
+      <div class="review-body">
+        <!-- 공통: 화자 이름 -->
+        <div class="rv-field">
+          <label>화자 이름 지정 <span class="opt">(선택)</span></label>
+          <div id="rv-speakers"></div>
+        </div>
+        <!-- 카테고리별 분석 필드 (JS로 렌더링) -->
+        <div id="rv-analysis-fields"></div>
+        <div class="rv-actions">
+          <button id="rv-save-btn">Vault에 저장</button>
+          <button id="rv-cancel-btn">취소</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="result">
+      <div class="result-card">
+        <div class="result-header">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+          처리 완료
+        </div>
+        <div class="result-body">
+          <p class="result-hint">Obsidian에서 바로 열기</p>
+          <a id="lnk-note" class="obs-btn" href="#">
+            <span class="obs-btn-icon">📝</span><span id="lnk-note-label">노트 열기</span>
+          </a>
+          <a id="lnk-transcript" class="obs-btn" href="#" style="display:none">
+            <span class="obs-btn-icon">📄</span>전사 노트 열기
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+
 <script>
+  // ── 카테고리 탭 ────────────────────────────────────────────────────────
+  let currentCategory = 'meeting';
+
+  const CAT_FIELDS = {
+    meeting:    'fields-meeting-like',
+    voice_memo: 'fields-voice-memo',
+    daily:      'fields-daily',
+    lecture:    'fields-lecture',
+    discussion: 'fields-meeting-like',  // 공유
+    reference:  'fields-reference',
+  };
+
+  const CAT_LABELS = {
+    meeting:    '회의',
+    voice_memo: '보이스 메모',
+    daily:      '데일리',
+    lecture:    '강의/세미나',
+    discussion: '프로젝트 논의',
+    reference:  '레퍼런스',
+  };
+
+  document.querySelectorAll('.cat-tab').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.cat-tab').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      currentCategory = btn.dataset.cat;
+      switchCategoryFields(currentCategory);
+    });
+  });
+
+  function switchCategoryFields(cat) {
+    const shown = new Set();
+    document.querySelectorAll('.cat-fields').forEach(el => el.classList.remove('visible'));
+    const fieldId = CAT_FIELDS[cat] || 'fields-meeting-like';
+    if (!shown.has(fieldId)) {
+      document.getElementById(fieldId).classList.add('visible');
+      shown.add(fieldId);
+    }
+    const projectField = document.getElementById('project-field');
+    if (projectField) {
+      projectField.style.display = (cat === 'meeting' || cat === 'discussion') ? 'block' : 'none';
+    }
+    const titleLabel = document.getElementById('title-label');
+    if (titleLabel) titleLabel.textContent = CAT_LABELS[cat] + ' 제목';
+    const contextLabel = document.getElementById('context-label');
+    if (contextLabel) contextLabel.innerHTML = CAT_LABELS[cat] + ' 맥락 <span class="opt">(전사·분석 정확도 향상)</span>';
+  }
+
+  function getFormValues() {
+    const cat = currentCategory;
+    let titleVal = '', contextVal = '';
+    if (cat === 'meeting' || cat === 'discussion') {
+      titleVal   = document.getElementById('title').value;
+      contextVal = document.getElementById('context').value;
+    } else if (cat === 'voice_memo') {
+      titleVal   = document.getElementById('vm-title').value;
+      contextVal = document.getElementById('vm-context').value;
+    } else if (cat === 'daily') {
+      titleVal   = '';
+      contextVal = document.getElementById('daily-context').value;
+    } else if (cat === 'lecture') {
+      titleVal   = document.getElementById('lec-title').value;
+      contextVal = document.getElementById('lec-context').value;
+    } else if (cat === 'reference') {
+      titleVal   = document.getElementById('ref-title').value;
+      contextVal = document.getElementById('ref-context').value;
+    }
+    return { titleVal, contextVal };
+  }
+
+  // ── 파일 선택 ──────────────────────────────────────────
   const dz = document.getElementById('drop-zone');
   const fi = document.getElementById('fi');
   const btn = document.getElementById('btn');
@@ -176,23 +816,137 @@
     if (e.dataTransfer.files[0]) setFile(e.dataTransfer.files[0]);
   });
   fi.addEventListener('change', () => { if (fi.files[0]) setFile(fi.files[0]); });
+  function setFile(f) { file = f; fname.textContent = f.name; btn.disabled = false; }
 
-  function setFile(f) {
-    file = f;
-    fname.textContent = f.name;
-    btn.disabled = false;
+  // ── 마이크 녹음 ────────────────────────────────────────
+  let recChunks = [], mediaRecorder = null, recStream = null;
+  let recTimerInterval = null, recSecs = 0;
+  const recStartBtn      = document.getElementById('rec-start-btn');
+  const recStopBtn       = document.getElementById('rec-stop-btn');
+  const recConfirmOk     = document.getElementById('rec-confirm-ok');
+  const recConfirmCancel = document.getElementById('rec-confirm-cancel');
+  let pendingRecFile = null;
+
+  if (!window.MediaRecorder) {
+    recStartBtn.disabled = true;
+    recStartBtn.textContent = '녹음 (이 브라우저 미지원)';
   }
+
+  recStartBtn.addEventListener('click', startRecording);
+  recStopBtn.addEventListener('click', stopRecording);
+  recConfirmOk.addEventListener('click', () => {
+    if (!pendingRecFile) return;
+    setFile(pendingRecFile); pendingRecFile = null; _showRecIdle();
+    document.getElementById('btn').click();
+  });
+  recConfirmCancel.addEventListener('click', () => { pendingRecFile = null; _showRecIdle(); });
+
+  async function startRecording() {
+    try { recStream = await navigator.mediaDevices.getUserMedia({ audio: true }); }
+    catch (e) { showErr('마이크 접근 권한이 필요합니다: ' + e.message); return; }
+    recChunks = [];
+    const mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/ogg';
+    mediaRecorder = new MediaRecorder(recStream, { mimeType });
+    mediaRecorder.ondataavailable = e => { if (e.data.size > 0) recChunks.push(e.data); };
+    mediaRecorder.onstop = () => {
+      const blob = new Blob(recChunks, { type: mimeType });
+      const ts = new Date().toISOString().replace(/[-:.TZ]/g, '').slice(0, 15);
+      const ext = mimeType.includes('webm') ? 'webm' : 'ogg';
+      pendingRecFile = new File([blob], `recording_${ts}.${ext}`, { type: mimeType });
+      _stopRecTimer();
+      const m = String(Math.floor(recSecs / 60)).padStart(2,'0');
+      const s = String(recSecs % 60).padStart(2,'0');
+      document.getElementById('rec-confirm-label').textContent = `${m}:${s} 녹음됨`;
+      _showRecConfirm();
+    };
+    mediaRecorder.start();
+    recSecs = 0;
+    recTimerInterval = setInterval(() => {
+      recSecs++;
+      const m = String(Math.floor(recSecs / 60)).padStart(2,'0');
+      const s = String(recSecs % 60).padStart(2,'0');
+      document.getElementById('rec-timer').textContent = `${m}:${s}`;
+    }, 1000);
+    _showRecActive();
+  }
+
+  function stopRecording() {
+    if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
+    if (recStream) { recStream.getTracks().forEach(t => t.stop()); recStream = null; }
+  }
+  function _stopRecTimer() { clearInterval(recTimerInterval); recTimerInterval = null; }
+  function _showRecActive()  { document.getElementById('rec-idle').style.display='none'; document.getElementById('rec-active').style.display='flex'; document.getElementById('rec-confirm').style.display='none'; }
+  function _showRecConfirm() { document.getElementById('rec-idle').style.display='none'; document.getElementById('rec-active').style.display='none'; document.getElementById('rec-confirm').style.display='flex'; }
+  function _showRecIdle()    { document.getElementById('rec-idle').style.display='block'; document.getElementById('rec-active').style.display='none'; document.getElementById('rec-confirm').style.display='none'; }
+
+  // ── 라이브 로그 ────────────────────────────────────────
+  let lastLogIndex = 0, cursorEl = null;
+
+  function appendLogs(logs) {
+    if (!logs || logs.length <= lastLogIndex) return;
+    const panel = document.getElementById('log-panel');
+    panel.style.display = 'block';
+    const prev = panel.querySelector('.log-line.latest');
+    if (prev) { prev.classList.remove('latest'); const c = prev.querySelector('.cursor'); if (c) c.remove(); }
+    for (let i = lastLogIndex; i < logs.length; i++) {
+      const line = document.createElement('div');
+      line.className = 'log-line' + (i === logs.length - 1 ? ' latest' : '');
+      line.textContent = logs[i];
+      panel.appendChild(line);
+    }
+    lastLogIndex = logs.length;
+    const lastLine = panel.querySelector('.log-line.latest');
+    if (lastLine) { cursorEl = document.createElement('span'); cursorEl.className = 'cursor'; lastLine.appendChild(cursorEl); }
+    panel.scrollTop = panel.scrollHeight;
+  }
+
+  function removeCursor() {
+    if (cursorEl) { cursorEl.remove(); cursorEl = null; }
+    const latest = document.querySelector('#log-panel .log-line.latest');
+    if (latest) latest.classList.remove('latest');
+  }
+
+  // ── 업로드 & 폴링 ──────────────────────────────────────
+  const cancelBtn = document.getElementById('cancel-btn');
+  let currentJobId = null, jobStartTime = null, elapsedTimer = null;
+
+  function startElapsedTimer() {
+    jobStartTime = Date.now(); clearInterval(elapsedTimer);
+    elapsedTimer = setInterval(() => {
+      const secs = Math.floor((Date.now() - jobStartTime) / 1000);
+      document.getElementById('elapsed-text').textContent = `경과 ${secs}초`;
+    }, 1000);
+  }
+  function stopElapsedTimer() { clearInterval(elapsedTimer); elapsedTimer = null; }
+
+  cancelBtn.addEventListener('click', async () => {
+    if (!currentJobId) return;
+    cancelBtn.disabled = true; cancelBtn.textContent = '취소 중...';
+    try { await fetch(`/cancel/${currentJobId}`, { method: 'POST' }); } catch (e) {}
+  });
 
   btn.addEventListener('click', async () => {
     if (!file) return;
-    btn.disabled = true;
-    show('progress'); hide('result'); hide('err');
+    btn.disabled = true; currentJobId = null; lastLogIndex = 0;
+    const logPanel = document.getElementById('log-panel');
+    logPanel.innerHTML = ''; logPanel.style.display = 'none';
+    progress.style.display = 'block';
+    cancelBtn.style.display = 'block'; cancelBtn.disabled = false; cancelBtn.textContent = '■ 처리 중단';
+    document.getElementById('right-placeholder').style.display = 'flex';
+    hide('result'); hide('err'); hide('review-panel');
+    ['s-upload','s-trans','s-ai','s-save'].forEach(id => setStep(id, ''));
+    document.getElementById('detail-text').textContent = '';
+    document.getElementById('elapsed-text').textContent = '';
+    document.getElementById('progress-bar').style.width = '0%';
     setStep('s-upload', 'active');
 
+    const { titleVal, contextVal } = getFormValues();
     const fd = new FormData();
     fd.append('file', file);
-    fd.append('title', document.getElementById('title').value);
-    fd.append('project', document.getElementById('project').value);
+    fd.append('title', titleVal);
+    fd.append('project', document.getElementById('project').value || '');
+    fd.append('context', contextVal);
+    fd.append('category', currentCategory);
 
     let jobId;
     try {
@@ -202,6 +956,8 @@
       jobId = d.job_id;
     } catch (e) { return showErr(e.message); }
 
+    currentJobId = jobId;
+    startElapsedTimer();
     setStep('s-upload', 'done');
     poll(jobId);
   });
@@ -210,55 +966,256 @@
     const t = setInterval(async () => {
       try {
         const d = await fetch(`/status/${id}`).then(r => r.json());
-
-        // 단계 표시
-        if (d.status === 'transcribing') {
+        if (d.status === 'review') {
+          setStep('s-ai', 'done');
+          setProgress(97, '분석 완료 — 내용을 확인하고 저장하세요.');
+          appendLogs(d.logs);
+          showReviewPanel(d.analysis, d.speakers, d.category || 'meeting');
+          return;
+        } else if (d.status === 'confirmed' || d.status === 'building' || d.status === 'saving') {
+          hide('review-panel'); cancelBtn.style.display = 'block';
+          if (d.status === 'building' || d.status === 'saving') { setStep('s-ai','done'); setStep('s-save','active'); }
+        } else if (d.status === 'cancelling') {
+          cancelBtn.textContent = '⏳ 현재 단계 완료 후 중단됩니다...';
+        } else if (d.status === 'transcribing') {
           setStep('s-trans', 'active');
         } else if (d.status === 'analyzing') {
           setStep('s-trans', 'done'); setStep('s-ai', 'active');
-        } else if (d.status === 'building' || d.status === 'saving') {
-          setStep('s-ai', 'done'); setStep('s-save', 'active');
         } else if (d.status === 'done') {
-          clearInterval(t);
-          setStep('s-save', 'done');
-          setProgress(100, d.detail || '완료', d.elapsed);
-          document.getElementById('lnk-meeting').href = d.result.meeting_uri;
-          document.getElementById('lnk-transcript').href = d.result.transcript_uri;
-          show('result'); btn.disabled = false;
-          return;
+          clearInterval(t); setStep('s-save', 'done');
+          setProgress(100, d.detail || '완료'); stopElapsedTimer();
+          appendLogs(d.logs); removeCursor(); cancelBtn.style.display = 'none';
+          document.getElementById('right-placeholder').style.display = 'none';
+          const noteLink = document.getElementById('lnk-note');
+          const noteLabel = document.getElementById('lnk-note-label');
+          noteLink.href = d.result.note_uri || d.result.meeting_uri || '#';
+          noteLabel.textContent = d.category === 'meeting' ? '회의 노트 열기'
+            : d.category === 'discussion' ? '논의 노트 열기'
+            : d.category === 'daily' ? '업무일지 열기'
+            : d.category === 'lecture' ? '강의 노트 열기'
+            : d.category === 'reference' ? '레퍼런스 노트 열기'
+            : '노트 열기';
+          const transcriptLink = document.getElementById('lnk-transcript');
+          if (d.result.transcript_uri) {
+            transcriptLink.href = d.result.transcript_uri;
+            transcriptLink.style.display = 'flex';
+          } else {
+            transcriptLink.style.display = 'none';
+          }
+          show('result'); btn.disabled = false; return;
+        } else if (d.status === 'cancelled') {
+          clearInterval(t); appendLogs(d.logs); removeCursor(); stopElapsedTimer();
+          cancelBtn.style.display = 'none'; showErr('처리가 취소됐습니다.'); btn.disabled = false; return;
         } else if (d.status === 'error') {
-          clearInterval(t); showErr(d.error); btn.disabled = false;
-          return;
+          clearInterval(t); appendLogs(d.logs); removeCursor(); stopElapsedTimer();
+          cancelBtn.style.display = 'none'; showErr(d.error); btn.disabled = false; return;
         }
-
-        // 프로그레스 바 + 상세 메시지 업데이트
-        setProgress(d.progress || 0, d.detail || '', d.elapsed || 0);
+        setProgress(d.progress || 0, d.detail || '');
+        appendLogs(d.logs);
       } catch (e) { clearInterval(t); showErr(e.message); btn.disabled = false; }
     }, 1500);
   }
 
-  function setProgress(pct, detail, elapsed) {
+  function setProgress(pct, detail) {
     document.getElementById('progress-bar').style.width = pct + '%';
     document.getElementById('detail-text').textContent = detail;
-    document.getElementById('elapsed-text').textContent =
-      elapsed > 0 ? `경과 ${elapsed}초` : '';
   }
 
-  const ICONS = { '': '⬜', active: '⏳', done: '✅' };
+  const ICONS = { '': '', active: '▶', done: '✓' };
   function setStep(id, state) {
     const el = document.getElementById(id);
     el.className = `step ${state}`;
-    el.querySelector('.ico').textContent = ICONS[state] ?? '⬜';
+    el.querySelector('.ico').textContent = ICONS[state] ?? '';
   }
 
-  function show(id) { document.getElementById(id).style.display = ''; }
+  const progress = document.getElementById('progress');
+  function show(id) { document.getElementById(id).style.display = 'block'; }
   function hide(id) { document.getElementById(id).style.display = 'none'; }
   function showErr(msg) {
     const el = document.getElementById('err');
-    el.textContent = '오류: ' + msg;
-    el.style.display = '';
-    btn.disabled = false;
+    el.textContent = '오류: ' + msg; el.style.display = 'block'; btn.disabled = false;
   }
+
+  // ── 프로젝트 목록 로드 ─────────────────────────────────
+  async function loadProjects() {
+    try {
+      const projects = await fetch('/projects').then(r => r.json());
+      const sel = document.getElementById('project');
+      projects.forEach(p => {
+        const opt = document.createElement('option');
+        opt.value = p.link; opt.textContent = p.display;
+        sel.appendChild(opt);
+      });
+    } catch (e) { console.warn('프로젝트 목록 로드 실패:', e); }
+  }
+  loadProjects();
+
+  // ── 검토 패널 ──────────────────────────────────────────
+  const CATEGORY_REVIEW_FIELDS = {
+    meeting: [
+      { id: 'purpose',      label: '회의 목적',   rows: 2, isList: false },
+      { id: 'discussion',   label: '주요 논의',   rows: 3, isList: true },
+      { id: 'decisions',    label: '결정 사항',   rows: 2, isList: true },
+      { id: 'action_items', label: '액션 아이템', rows: 3, isList: true },
+      { id: 'follow_up',    label: '후속 과제',   rows: 2, isList: true },
+    ],
+    discussion: [
+      { id: 'purpose',      label: '목적',       rows: 2, isList: false },
+      { id: 'discussion',   label: '주요 논의',  rows: 3, isList: true },
+      { id: 'decisions',    label: '결정 사항',  rows: 2, isList: true },
+      { id: 'action_items', label: '액션 아이템',rows: 3, isList: true },
+      { id: 'follow_up',    label: '후속 질문',  rows: 2, isList: true },
+    ],
+    voice_memo: [
+      { id: 'summary',      label: '요약',       rows: 2, isList: false },
+      { id: 'key_points',   label: '핵심 포인트',rows: 3, isList: true },
+      { id: 'action_items', label: '할 일',      rows: 2, isList: true },
+    ],
+    daily: [
+      { id: 'tasks_done',     label: '완료 업무',  rows: 3, isList: true },
+      { id: 'tasks_tomorrow', label: '내일 할 일', rows: 3, isList: true },
+      { id: 'issues',         label: '문제/이슈',  rows: 2, isList: true },
+      { id: 'reflection',     label: '소감',       rows: 2, isList: false },
+    ],
+    lecture: [
+      { id: 'summary',          label: '강의 요약',  rows: 2, isList: false },
+      { id: 'key_concepts',     label: '핵심 개념',  rows: 3, isList: true },
+      { id: 'important_points', label: '중요 포인트',rows: 3, isList: true },
+      { id: 'references',       label: '참고 자료',  rows: 2, isList: true },
+      { id: 'questions',        label: '질문',       rows: 2, isList: true },
+    ],
+    reference: [
+      { id: 'summary',       label: '요약',              rows: 2, isList: false },
+      { id: 'key_findings',  label: '핵심 발견',         rows: 3, isList: true },
+      { id: 'methodology',   label: '방법론',            rows: 2, isList: false },
+      { id: 'applicability', label: '업무 적용 가능성',  rows: 2, isList: false },
+      { id: 'citations',     label: '인용',              rows: 2, isList: true },
+    ],
+  };
+
+  function showReviewPanel(analysis, speakers, category) {
+    if (!analysis) return;
+    document.getElementById('right-placeholder').style.display = 'none';
+
+    const speakerSection = document.getElementById('rv-speakers');
+    speakerSection.innerHTML = '';
+    (speakers || []).forEach(sp => {
+      const row = document.createElement('div');
+      row.className = 'rv-speaker-row';
+      row.innerHTML = `<span class="rv-speaker-label">${sp}</span><span class="rv-speaker-arrow">→</span><input type="text" class="rv-speaker-input" data-speaker="${sp}" placeholder="실명 (비워두면 ${sp})">`;
+      speakerSection.appendChild(row);
+    });
+
+    const fields = CATEGORY_REVIEW_FIELDS[category] || CATEGORY_REVIEW_FIELDS['meeting'];
+    const container = document.getElementById('rv-analysis-fields');
+    container.innerHTML = '';
+    fields.forEach(f => {
+      const div = document.createElement('div');
+      div.className = 'rv-field';
+      const val = analysis[f.id];
+      const displayVal = f.isList ? (val || []).join('\n') : (val || '');
+      div.innerHTML = `<label>${f.label}${f.isList ? ' <span class="opt">(줄바꿈으로 구분)</span>' : ''}</label><textarea id="rv-${f.id}" rows="${f.rows}">${displayVal}</textarea>`;
+      container.appendChild(div);
+    });
+
+    document.getElementById('review-panel').style.display = 'block';
+    cancelBtn.style.display = 'none';
+    const rvSave = document.getElementById('rv-save-btn');
+    rvSave.disabled = false; rvSave.textContent = 'Vault에 저장';
+  }
+
+  document.getElementById('rv-save-btn').addEventListener('click', async () => {
+    const saveBtn = document.getElementById('rv-save-btn');
+    saveBtn.disabled = true; saveBtn.textContent = '저장 중...';
+
+    const speakerMap = {};
+    document.querySelectorAll('.rv-speaker-input').forEach(input => {
+      const val = input.value.trim(); if (val) speakerMap[input.dataset.speaker] = val;
+    });
+
+    const analysis = {};
+    const cat = currentCategory;
+    const fields = CATEGORY_REVIEW_FIELDS[cat] || CATEGORY_REVIEW_FIELDS['meeting'];
+    fields.forEach(f => {
+      const el = document.getElementById(`rv-${f.id}`);
+      if (!el) return;
+      analysis[f.id] = f.isList
+        ? el.value.split('\n').map(l => l.trim()).filter(Boolean)
+        : el.value.trim();
+    });
+
+    const payload = { speaker_map: speakerMap, analysis };
+    try {
+      const r = await fetch(`/confirm/${currentJobId}`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+      });
+      if (!r.ok) throw new Error(await r.text());
+      hide('review-panel'); setStep('s-save', 'active');
+    } catch (e) {
+      saveBtn.disabled = false; saveBtn.textContent = 'Vault에 저장';
+      showErr('저장 요청 실패: ' + e.message);
+    }
+  });
+
+  document.getElementById('rv-cancel-btn').addEventListener('click', async () => {
+    if (!currentJobId) return;
+    hide('review-panel');
+    document.getElementById('right-placeholder').style.display = 'flex';
+    try { await fetch(`/cancel/${currentJobId}`, { method: 'POST' }); } catch (e) {}
+    showErr('처리가 취소됐습니다.'); btn.disabled = false;
+  });
+
+  // ── 설정 모달 ───────────────────────────────────────────
+  const overlay = document.getElementById('modal-overlay');
+  document.getElementById('settings-btn').addEventListener('click', openSettings);
+  document.getElementById('modal-close').addEventListener('click', () => overlay.classList.remove('open'));
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.classList.remove('open'); });
+
+  async function openSettings() {
+    try {
+      const s = await fetch('/settings').then(r => r.json());
+      document.getElementById('s-whisper').value = s.WHISPER_MODEL || 'base';
+      document.getElementById('s-vault').value   = s.VAULT_PATH || '';
+      document.getElementById('s-folder').value  = s.MEETINGS_FOLDER || '';
+      document.getElementById('s-domain-vocab').value = s.DOMAIN_VOCAB || '';
+      document.getElementById('s-inbox-folder').value    = s.INBOX_FOLDER    || '';
+      document.getElementById('s-daily-folder').value    = s.DAILY_FOLDER    || '';
+      document.getElementById('s-areas-folder').value    = s.AREAS_FOLDER    || '';
+      document.getElementById('s-projects-folder').value = s.PROJECTS_FOLDER || '';
+      document.getElementById('s-resources-folder').value = s.RESOURCES_FOLDER || '';
+      document.getElementById('s-gemini').placeholder = s.GEMINI_API_KEY ? '●●●●●●●● (변경 시 입력)' : 'AIza...';
+      document.getElementById('s-openai').placeholder = s.OPENAI_API_KEY ? '●●●●●●●● (변경 시 입력)' : 'sk-...';
+      document.getElementById('s-hf').placeholder     = s.HF_TOKEN      ? '●●●●●●●● (변경 시 입력)' : 'hf_...';
+      document.getElementById('save-msg').textContent = '';
+    } catch (e) { document.getElementById('save-msg').textContent = '설정 로드 실패: ' + e.message; }
+    overlay.classList.add('open');
+  }
+
+  document.getElementById('save-btn').addEventListener('click', async () => {
+    const payload = {
+      WHISPER_MODEL: document.getElementById('s-whisper').value,
+      GEMINI_API_KEY: document.getElementById('s-gemini').value,
+      OPENAI_API_KEY: document.getElementById('s-openai').value,
+      HF_TOKEN:       document.getElementById('s-hf').value,
+      VAULT_PATH:     document.getElementById('s-vault').value,
+      MEETINGS_FOLDER: document.getElementById('s-folder').value,
+      INBOX_FOLDER:     document.getElementById('s-inbox-folder').value,
+      DAILY_FOLDER:     document.getElementById('s-daily-folder').value,
+      AREAS_FOLDER:     document.getElementById('s-areas-folder').value,
+      PROJECTS_FOLDER:  document.getElementById('s-projects-folder').value,
+      RESOURCES_FOLDER: document.getElementById('s-resources-folder').value,
+      DOMAIN_VOCAB:   document.getElementById('s-domain-vocab').value,
+    };
+    try {
+      const r = await fetch('/settings', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+      });
+      if (!r.ok) throw new Error(await r.text());
+      document.getElementById('save-msg').textContent = '저장됐습니다.';
+      ['s-gemini','s-openai','s-hf'].forEach(id => document.getElementById(id).value = '');
+      setTimeout(() => overlay.classList.remove('open'), 800);
+    } catch (e) { document.getElementById('save-msg').textContent = '저장 실패: ' + e.message; }
+  });
 </script>
 </body>
 </html>

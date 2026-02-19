@@ -54,7 +54,7 @@ def test_full_pipeline(tmp_vault, monkeypatch):
     )
 
     # 4. 저장
-    res = VaultWriter(tmp_vault, "10_Calendar/13_Meetings").save(
+    res = VaultWriter(tmp_vault, folder_overrides={"meeting": "10_Calendar/13_Meetings"}).save(
         nd, build_meeting_note(nd), build_transcript_note(nd)
     )
     assert Path(res["meeting_path"]).exists()

@@ -1,5 +1,6 @@
 fastapi==0.115.0
 itsdangerous>=2.1
+qrcode>=7.0
 uvicorn[standard]==0.30.0
 python-multipart==0.0.9
 openai-whisper==20240930

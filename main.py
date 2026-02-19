@@ -386,6 +386,7 @@ def _process(job_id: str, audio_path: Path, title: str, project: str, original_f
             "analysis": analysis,
             "category": category,
             "speakers": review_speakers,
+            "segments": transcript_result["segments"],
             "elapsed": int(time.time() - start_time),
         })
 

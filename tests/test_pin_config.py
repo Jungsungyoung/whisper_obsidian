@@ -1,19 +1,22 @@
 """ACCESS_PIN, SECRET_KEY 환경변수 로딩 테스트"""
 import importlib
 import os
+from unittest.mock import patch
 
 
 def test_access_pin_default_empty():
-    os.environ.pop("ACCESS_PIN", None)
     import config
-    importlib.reload(config)
+    os.environ.pop("ACCESS_PIN", None)
+    with patch("dotenv.load_dotenv"):
+        importlib.reload(config)
     assert config.ACCESS_PIN == ""
 
 
 def test_access_pin_from_env():
     os.environ["ACCESS_PIN"] = "9999"
     import config
-    importlib.reload(config)
+    with patch("dotenv.load_dotenv"):
+        importlib.reload(config)
     assert config.ACCESS_PIN == "9999"
     os.environ.pop("ACCESS_PIN")
 

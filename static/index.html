@@ -340,6 +340,46 @@
     }
     #rv-cancel-btn:hover { border-color: var(--danger-border); color: var(--danger); background: var(--danger-bg); }
 
+    #rv-view-transcript-btn {
+      margin-left: auto; padding: 4px 10px;
+      background: none; border: 1px solid var(--warn-border); border-radius: 6px;
+      color: var(--warn-text); font-family: var(--font); font-size: 0.73rem;
+      cursor: pointer; transition: all .15s; white-space: nowrap;
+    }
+    #rv-view-transcript-btn:hover { background: #fef3c7; border-color: var(--warn-dot); }
+
+    /* ── TRANSCRIPT MODAL ── */
+    #transcript-overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,0.45); z-index: 300;
+      align-items: center; justify-content: center; backdrop-filter: blur(2px);
+    }
+    #transcript-overlay.open { display: flex; }
+    .transcript-modal {
+      background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg);
+      width: 680px; max-width: calc(100vw - 32px); max-height: 80vh;
+      display: flex; flex-direction: column;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.15), 0 8px 20px rgba(0,0,0,0.08);
+    }
+    .transcript-modal-header {
+      padding: 14px 20px; border-bottom: 1px solid var(--border);
+      display: flex; justify-content: space-between; align-items: center; flex-shrink: 0;
+    }
+    .transcript-modal-header .modal-title { font-weight: 600; font-size: 0.9rem; }
+    #transcript-close {
+      width: 28px; height: 28px; display: flex; align-items: center; justify-content: center;
+      background: none; border: 1px solid var(--border); border-radius: 6px;
+      cursor: pointer; color: var(--text-3); font-size: 0.75rem; transition: all .15s;
+    }
+    #transcript-close:hover { border-color: var(--border-strong); color: var(--text-2); background: var(--surface-2); }
+    #transcript-content {
+      padding: 16px 20px; overflow-y: auto; flex: 1;
+      font-family: var(--font-mono); font-size: 0.72rem; line-height: 1.75;
+      color: var(--text-2); white-space: pre-wrap; word-break: break-word;
+    }
+    #transcript-content::-webkit-scrollbar { width: 4px; }
+    #transcript-content::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
     /* ── RESULT ── */
     #result { display: none; }
     .result-card {
@@ -436,6 +476,17 @@
   </style>
 </head>
 <body>
+
+<!-- 전체 전사 내용 모달 -->
+<div id="transcript-overlay">
+  <div class="transcript-modal">
+    <div class="transcript-modal-header">
+      <span class="modal-title">전체 전사 내용</span>
+      <button id="transcript-close">✕</button>
+    </div>
+    <div id="transcript-content"></div>
+  </div>
+</div>
 
 <!-- 설정 모달 -->
 <div id="modal-overlay">
@@ -716,6 +767,7 @@
       <div class="review-header">
         <div class="review-badge"></div>
         <span class="review-title">분석 결과 검토 — 저장 전 내용을 확인하세요</span>
+        <button id="rv-view-transcript-btn" style="display:none">전체 내용 보기 ↗</button>
       </div>
       <div class="review-body">
         <!-- 공통: 화자 이름 -->
@@ -930,6 +982,7 @@
   // ── 업로드 & 폴링 ──────────────────────────────────────
   const cancelBtn = document.getElementById('cancel-btn');
   let currentJobId = null, jobStartTime = null, elapsedTimer = null;
+  let currentSegments = [];
 
   function startElapsedTimer() {
     jobStartTime = Date.now(); clearInterval(elapsedTimer);
@@ -984,14 +1037,16 @@
   });
 
   function poll(id) {
-    const t = setInterval(async () => {
+    let timer;
+    async function tick() {
       try {
         const d = await fetch(`/status/${id}`).then(r => r.json());
         if (d.status === 'review') {
+          clearInterval(timer);
           setStep('s-ai', 'done');
           setProgress(97, '분석 완료 — 내용을 확인하고 저장하세요.');
           appendLogs(d.logs);
-          showReviewPanel(d.analysis, d.speakers, d.category || 'meeting');
+          showReviewPanel(d.analysis, d.speakers, d.category || 'meeting', d.segments || []);
           return;
         } else if (d.status === 'confirmed' || d.status === 'building' || d.status === 'saving') {
           hide('review-panel'); cancelBtn.style.display = 'block';
@@ -1003,7 +1058,7 @@
         } else if (d.status === 'analyzing') {
           setStep('s-trans', 'done'); setStep('s-ai', 'active');
         } else if (d.status === 'done') {
-          clearInterval(t); setStep('s-save', 'done');
+          clearInterval(timer); setStep('s-save', 'done');
           setProgress(100, d.detail || '완료'); stopElapsedTimer();
           appendLogs(d.logs); removeCursor(); cancelBtn.style.display = 'none';
           document.getElementById('right-placeholder').style.display = 'none';
@@ -1025,16 +1080,18 @@
           }
           show('result'); btn.disabled = false; return;
         } else if (d.status === 'cancelled') {
-          clearInterval(t); appendLogs(d.logs); removeCursor(); stopElapsedTimer();
+          clearInterval(timer); appendLogs(d.logs); removeCursor(); stopElapsedTimer();
           cancelBtn.style.display = 'none'; showErr('처리가 취소됐습니다.'); btn.disabled = false; return;
         } else if (d.status === 'error') {
-          clearInterval(t); appendLogs(d.logs); removeCursor(); stopElapsedTimer();
+          clearInterval(timer); appendLogs(d.logs); removeCursor(); stopElapsedTimer();
           cancelBtn.style.display = 'none'; showErr(d.error); btn.disabled = false; return;
         }
         setProgress(d.progress || 0, d.detail || '');
         appendLogs(d.logs);
-      } catch (e) { clearInterval(t); showErr(e.message); btn.disabled = false; }
-    }, 1500);
+      } catch (e) { clearInterval(timer); showErr(e.message); btn.disabled = false; }
+    }
+    tick();
+    timer = setInterval(tick, 1500);
   }
 
   function setProgress(pct, detail) {
@@ -1114,9 +1171,11 @@
     ],
   };
 
-  function showReviewPanel(analysis, speakers, category) {
+  function showReviewPanel(analysis, speakers, category, segments) {
     if (!analysis) return;
     document.getElementById('right-placeholder').style.display = 'none';
+
+    currentSegments = segments || [];
 
     const speakerSection = document.getElementById('rv-speakers');
     speakerSection.innerHTML = '';
@@ -1138,6 +1197,9 @@
       div.innerHTML = `<label>${f.label}${f.isList ? ' <span class="opt">(줄바꿈으로 구분)</span>' : ''}</label><textarea id="rv-${f.id}" rows="${f.rows}">${displayVal}</textarea>`;
       container.appendChild(div);
     });
+
+    const viewBtn = document.getElementById('rv-view-transcript-btn');
+    viewBtn.style.display = currentSegments.length ? 'block' : 'none';
 
     document.getElementById('review-panel').style.display = 'block';
     cancelBtn.style.display = 'none';
@@ -1172,6 +1234,7 @@
       });
       if (!r.ok) throw new Error(await r.text());
       hide('review-panel'); setStep('s-save', 'active');
+      poll(currentJobId);
     } catch (e) {
       saveBtn.disabled = false; saveBtn.textContent = 'Vault에 저장';
       showErr('저장 요청 실패: ' + e.message);
@@ -1185,6 +1248,21 @@
     try { await fetch(`/cancel/${currentJobId}`, { method: 'POST' }); } catch (e) {}
     showErr('처리가 취소됐습니다.'); btn.disabled = false;
   });
+
+  // ── 전체 전사 내용 모달 ─────────────────────────────────
+  const transcriptOverlay = document.getElementById('transcript-overlay');
+  document.getElementById('rv-view-transcript-btn').addEventListener('click', () => {
+    const hasSpeakers = currentSegments.some(s => s.speaker && s.speaker !== 'Speaker A' || currentSegments.length && currentSegments[0].speaker);
+    const lines = currentSegments.map(s => {
+      const ts = s.timestamp ? `[${s.timestamp}] ` : '';
+      const sp = s.speaker ? `${s.speaker}: ` : '';
+      return `${ts}${sp}${s.text}`;
+    }).join('\n');
+    document.getElementById('transcript-content').textContent = lines || '전사 내용이 없습니다.';
+    transcriptOverlay.classList.add('open');
+  });
+  document.getElementById('transcript-close').addEventListener('click', () => transcriptOverlay.classList.remove('open'));
+  transcriptOverlay.addEventListener('click', e => { if (e.target === transcriptOverlay) transcriptOverlay.classList.remove('open'); });
 
   // ── 설정 모달 ───────────────────────────────────────────
   const overlay = document.getElementById('modal-overlay');

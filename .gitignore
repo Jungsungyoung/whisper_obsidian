@@ -1,5 +1,7 @@
 .env
 uploads/
+local-vault/
+tmp_pytest/
 __pycache__/
 *.pyc
 *.pyo

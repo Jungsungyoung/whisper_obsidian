@@ -16,7 +16,9 @@ except Exception:
 
 from fastapi import FastAPI, UploadFile, File, Form, BackgroundTasks, HTTPException
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
+from fastapi import Request
+from starlette.middleware.sessions import SessionMiddleware
 from pydantic import BaseModel
 
 import config
@@ -42,7 +44,88 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="MeetScribe", lifespan=lifespan)
+
+# ── PIN AUTH MIDDLEWARE (SessionMiddleware보다 먼저 선언 → 내부에서 실행됨) ──
+@app.middleware("http")
+async def pin_auth_middleware(request: Request, call_next):
+    if not config.ACCESS_PIN:
+        return await call_next(request)
+    path = request.url.path
+    if path == "/login" or path.startswith("/static"):
+        return await call_next(request)
+    if request.session.get("authenticated"):
+        return await call_next(request)
+    return RedirectResponse(url="/login", status_code=302)
+
+
+# ── SESSION MIDDLEWARE (나중에 추가 = outermost = 먼저 실행됨) ──
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=config.SECRET_KEY,
+    max_age=86400,  # 24시간
+    https_only=False,  # Cloudflare Tunnel은 HTTPS이지만 내부는 HTTP
+    same_site="lax",
+)
+
 app.mount("/static", StaticFiles(directory=str(Path(__file__).parent / "static")), name="static")
+
+
+_LOGIN_HTML = """<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MeetScribe — 로그인</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+           background: #f4f4f2; display: flex; align-items: center;
+           justify-content: center; min-height: 100vh; padding: 20px; }
+    .card { background: #fff; border-radius: 12px; padding: 32px 28px;
+            width: 100%; max-width: 360px; box-shadow: 0 2px 12px rgba(0,0,0,.08); }
+    h1 { font-size: 1.1rem; font-weight: 700; margin-bottom: 4px; }
+    p  { font-size: 0.82rem; color: #666; margin-bottom: 24px; }
+    label { display: block; font-size: 0.78rem; font-weight: 500;
+            color: #555; margin-bottom: 6px; }
+    input[type=password] { width: 100%; padding: 10px 12px; border: 1px solid #ddd;
+                           border-radius: 8px; font-size: 1rem; outline: none;
+                           transition: border-color .15s; }
+    input[type=password]:focus { border-color: #2563eb; }
+    button { width: 100%; padding: 11px; margin-top: 14px;
+             background: #2563eb; color: #fff; border: none; border-radius: 8px;
+             font-size: 0.9rem; font-weight: 600; cursor: pointer; }
+    button:hover { background: #1d4ed8; }
+    .err { color: #dc2626; font-size: 0.8rem; margin-top: 10px; display: none; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>MeetScribe</h1>
+    <p>접속 PIN을 입력하세요.</p>
+    <form method="post" action="/login">
+      <label for="pin">PIN</label>
+      <input type="password" id="pin" name="pin" autocomplete="current-password"
+             inputmode="numeric" placeholder="••••" autofocus>
+      <button type="submit">확인</button>
+    </form>
+    {error}
+  </div>
+</body>
+</html>"""
+
+
+@app.get("/login", response_class=HTMLResponse)
+def login_page():
+    return HTMLResponse(_LOGIN_HTML.replace("{error}", ""))
+
+
+@app.post("/login", response_class=HTMLResponse)
+async def login_submit(request: Request, pin: str = Form("")):
+    if pin == config.ACCESS_PIN:
+        request.session["authenticated"] = True
+        return RedirectResponse(url="/", status_code=303)
+    err = '<p class="err" style="display:block">PIN이 올바르지 않습니다.</p>'
+    return HTMLResponse(_LOGIN_HTML.replace("{error}", err), status_code=401)
 
 
 @app.get("/")

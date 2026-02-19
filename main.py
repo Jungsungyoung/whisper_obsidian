@@ -14,10 +14,9 @@ try:
 except Exception:
     pass
 
-from fastapi import FastAPI, UploadFile, File, Form, BackgroundTasks, HTTPException
+from fastapi import FastAPI, Request, UploadFile, File, Form, BackgroundTasks, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
-from fastapi import Request
 from starlette.middleware.sessions import SessionMiddleware
 from pydantic import BaseModel
 

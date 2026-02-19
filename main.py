@@ -50,7 +50,7 @@ async def pin_auth_middleware(request: Request, call_next):
     if not config.ACCESS_PIN:
         return await call_next(request)
     path = request.url.path
-    if path == "/login" or path.startswith("/static"):
+    if path in ("/login", "/logout") or path.startswith("/static"):
         return await call_next(request)
     if request.session.get("authenticated"):
         return await call_next(request)
@@ -125,6 +125,12 @@ async def login_submit(request: Request, pin: str = Form("")):
         return RedirectResponse(url="/", status_code=303)
     err = '<p class="err" style="display:block">PIN이 올바르지 않습니다.</p>'
     return HTMLResponse(_LOGIN_HTML.replace("{error}", err), status_code=401)
+
+
+@app.get("/logout")
+async def logout(request: Request):
+    request.session.clear()
+    return RedirectResponse(url="/login", status_code=303)
 
 
 @app.get("/")

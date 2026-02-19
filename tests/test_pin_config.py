@@ -22,7 +22,9 @@ def test_secret_key_default():
     os.environ.pop("SECRET_KEY", None)
     import config
     importlib.reload(config)
-    assert config.SECRET_KEY == "meetscribe-dev-secret"
+    # SECRET_KEY가 없으면 랜덤 hex 토큰이 생성돼야 함 (예측 불가, 빈 문자열 아님)
+    assert len(config.SECRET_KEY) == 64  # secrets.token_hex(32) → 64자 hex 문자열
+    assert config.SECRET_KEY != "meetscribe-dev-secret"
 
 
 def test_secret_key_from_env():

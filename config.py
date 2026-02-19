@@ -1,4 +1,5 @@
 import os
+import secrets as _secrets
 from pathlib import Path
 from dotenv import load_dotenv
 
@@ -20,7 +21,7 @@ UPLOAD_DIR: Path = Path(__file__).parent / "uploads"
 ALLOW_CPU: bool = os.getenv("ALLOW_CPU", "false").strip().lower() == "true"
 DOMAIN_VOCAB: str = os.getenv("DOMAIN_VOCAB", "함정, 선박, 전투체계, 소나, 레이더, 추진체계, 함교, 수상함, 잠수함, 어뢰, 기관실, 항법, 통신체계").strip()
 ACCESS_PIN: str = os.getenv("ACCESS_PIN", "").strip()
-SECRET_KEY: str = os.getenv("SECRET_KEY", "meetscribe-dev-secret").strip()
+SECRET_KEY: str = os.getenv("SECRET_KEY", "").strip() or _secrets.token_hex(32)
 
 
 def validate_config() -> None:

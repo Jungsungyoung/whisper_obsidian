@@ -1,7 +1,7 @@
 # MeetScribe 개발 기여 가이드
 
-> 소스 기준: `requirements.txt`, `.env.example`, `config.py`
-> 최종 업데이트: 2026-02-20
+> 소스 기준: `requirements.txt`, `config.py`
+> 최종 업데이트: 2026-02-20 (MD 임포트 기능 반영)
 
 ---
 
@@ -136,8 +136,9 @@ pytest tests/ -v
 
 | 파일 | 대상 |
 |------|------|
-| `tests/test_note_builder.py` | Obsidian 노트 마크다운 생성 |
-| `tests/test_vault_writer.py` | Vault 파일 저장 |
+| `tests/test_note_builder.py` | Obsidian 노트 마크다운 생성 (MD 임포트 포함) |
+| `tests/test_vault_writer.py` | Vault 파일 저장 (MD dual-note 포함) |
+| `tests/test_md_upload.py` | `read_md_text()` — MD 파일 인코딩 파싱 |
 | `tests/test_analyzer.py` | Gemini/GPT 분석 파이프라인 |
 | `tests/test_speaker_map.py` | 화자 매핑 로직 |
 | `tests/test_vocab_context.py` | 도메인 어휘 컨텍스트 |

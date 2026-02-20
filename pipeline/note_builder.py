@@ -18,6 +18,8 @@ class NoteData:
     project: str = ""
     category: str = "meeting"
     extra: dict = None  # 비회의 카테고리의 분석 결과 (voice_memo, daily 등)
+    source_type: str = "audio"    # "audio" | "md"
+    md_source_text: str = ""      # MD 원문 텍스트 (source_type=="md"일 때만 사용)
 
 
 # ── 파일명 ────────────────────────────────────────────────────────────
@@ -32,6 +34,17 @@ def get_note_filenames(data: NoteData) -> str | tuple[str, str]:
     """카테고리별 파일명 반환. 2개 노트 카테고리는 tuple, 1개는 str."""
     date_str = data.date.strftime("%Y-%m-%d")
     cat = data.category
+    if data.source_type == "md":
+        source_fn = f"[원문] {date_str} {data.title}.md"
+        main_fn_map = {
+            "meeting":    f"[회의] {date_str} {data.title}.md",
+            "discussion": f"[논의] {date_str} {data.title}.md",
+            "daily":      f"[업무일지] {date_str}.md",
+            "lecture":    f"[강의] {date_str} {data.title}.md",
+            "reference":  f"[레퍼런스] {date_str} {data.title}.md",
+            "voice_memo": f"[메모] {date_str} {data.title}.md",
+        }
+        return main_fn_map.get(cat, f"[메모] {date_str} {data.title}.md"), source_fn
     if cat == "meeting":
         return f"[회의] {date_str} {data.title}.md", f"[전사] {date_str} {data.title}.md"
     elif cat == "discussion":
@@ -66,7 +79,7 @@ def build_note(data: NoteData) -> str:
 
 def build_meeting_note(data: NoteData) -> str:
     date_str = data.date.strftime("%Y-%m-%d")
-    _, transcript_fn = get_filenames(data)
+    _, transcript_fn = get_note_filenames(data)
     transcript_link = transcript_fn[:-3]
 
     participants_yaml = "\n".join(f"  - {s}" for s in data.speakers)
@@ -258,4 +271,26 @@ def build_reference_note(data: NoteData) -> str:
         f"## 방법론\n{extra.get('methodology', '')}\n\n"
         f"## 업무 적용 가능성\n{extra.get('applicability', '')}\n\n"
         f"## 인용\n{citations}\n"
+    )
+
+
+# ── MD 원문 보존 노트 ──────────────────────────────────────────────────
+
+def build_source_note(data: NoteData) -> str:
+    """MD 원문을 보존하는 노트 (source_type='md'일 때 transcript_note 위치에 저장)."""
+    date_str = data.date.strftime("%Y-%m-%d")
+    filenames = get_note_filenames(data)
+    main_fn = filenames[0] if isinstance(filenames, tuple) else filenames
+    main_link = main_fn[:-3]
+    return (
+        f"---\n"
+        f"date: {date_str}\n"
+        f"type: md-source\n"
+        f"source_file: \"{data.audio_filename}\"\n"
+        f"category: {data.category}\n"
+        f"tags:\n  - md-import\n"
+        f"---\n\n"
+        f"# {data.title} (원문)\n\n"
+        f"> 정리 노트: [[{main_link}]]\n\n"
+        f"{data.md_source_text}\n"
     )

@@ -4,6 +4,7 @@ from pipeline.note_builder import (
     build_meeting_note, build_transcript_note, NoteData, get_filenames,
     get_note_filenames, build_discussion_note, build_voice_memo_note,
     build_daily_note, build_lecture_note, build_reference_note, build_note,
+    build_source_note,
 )
 
 SAMPLE_DATA = NoteData(
@@ -189,3 +190,75 @@ def test_build_note_raises_for_meeting():
                     category="meeting")
     with pytest.raises(ValueError, match="unsupported category"):
         build_note(data)
+
+
+# ── MD 임포트 테스트 ─────────────────────────────────────────────────────
+
+MD_IMPORT_DATA = NoteData(
+    date=date(2026, 2, 20),
+    title="AI 논문 정리",
+    audio_filename="ai_paper.md",
+    duration="0:00",
+    speakers=[],
+    purpose="", discussion=[], decisions=[], action_items=[], follow_up=[],
+    transcript=[],
+    category="reference",
+    source_type="md",
+    md_source_text="# 논문 제목\n\n본문 내용입니다.",
+)
+
+
+def test_md_get_note_filenames_returns_tuple():
+    result = get_note_filenames(MD_IMPORT_DATA)
+    assert isinstance(result, tuple), "MD 임포트는 항상 dual-note(tuple) 반환"
+
+
+def test_md_source_filename_has_correct_prefix():
+    _, source_fn = get_note_filenames(MD_IMPORT_DATA)
+    assert source_fn.startswith("[원문]")
+    assert source_fn.endswith(".md")
+
+
+def test_audio_reference_still_returns_str():
+    """source_type='audio'인 reference 카테고리는 기존처럼 단일 노트(str)."""
+    audio_ref = NoteData(
+        date=date(2026, 2, 20), title="테스트",
+        audio_filename="test.mp3", duration="1:00",
+        speakers=[], purpose="", discussion=[], decisions=[],
+        action_items=[], follow_up=[], transcript=[],
+        category="reference",
+    )
+    assert isinstance(get_note_filenames(audio_ref), str)
+
+
+def test_build_source_note_has_frontmatter():
+    note = build_source_note(MD_IMPORT_DATA)
+    assert note.startswith("---\n")
+    assert "type: md-source" in note
+    assert "category: reference" in note
+
+
+def test_build_source_note_contains_original_text():
+    note = build_source_note(MD_IMPORT_DATA)
+    assert "# 논문 제목" in note
+    assert "본문 내용입니다." in note
+
+
+def test_build_source_note_has_backlink_to_main():
+    note = build_source_note(MD_IMPORT_DATA)
+    assert "[[" in note  # 메인 노트 링크 존재
+
+
+def test_meeting_note_with_md_links_to_source_not_transcript():
+    """MD 회의 임포트: build_meeting_note가 [원문] 파일을 링크해야 함."""
+    md_meeting = NoteData(
+        date=date(2026, 2, 20), title="회의 메모",
+        audio_filename="meeting_notes.md", duration="0:00",
+        speakers=[], purpose="목적", discussion=[], decisions=[],
+        action_items=[], follow_up=[], transcript=[],
+        category="meeting", source_type="md",
+        md_source_text="# 회의 내용",
+    )
+    note = build_meeting_note(md_meeting)
+    assert "[원문]" in note
+    assert "[전사]" not in note

@@ -1,7 +1,8 @@
 from datetime import date
+from pathlib import Path
 from pipeline.note_builder import (
     NoteData, build_meeting_note, build_transcript_note, get_filenames,
-    build_voice_memo_note, build_daily_note,
+    build_voice_memo_note, build_daily_note, build_source_note,
 )
 from pipeline.vault_writer import VaultWriter
 
@@ -95,3 +96,62 @@ def test_discussion_saves_in_project_subfolder(tmp_path):
     note = build_discussion_note(data)
     writer.save(data, note, "")
     assert (tmp_path / "Projects" / "MyProject" / "[논의] 2026-02-18 설계 논의.md").exists()
+
+
+# ── MD 임포트 dual-note 저장 테스트 ────────────────────────────────────
+
+def test_md_reference_saves_dual_note(tmp_path):
+    """MD reference 임포트: 메인 노트 + 원문 노트 둘 다 저장되는지 확인."""
+    vault = tmp_path / "Vault"
+    md_data = NoteData(
+        date=date(2026, 2, 20),
+        title="AI 논문",
+        audio_filename="ai_paper.md",
+        duration="0:00",
+        speakers=[],
+        purpose="", discussion=[], decisions=[], action_items=[], follow_up=[],
+        transcript=[],
+        category="reference",
+        extra={"summary": "요약", "key_findings": [], "methodology": "", "applicability": "", "citations": []},
+        source_type="md",
+        md_source_text="# 논문 원문\n내용",
+    )
+    writer = VaultWriter(vault, folder_overrides={"reference": "Resources"})
+    from pipeline.note_builder import build_reference_note
+    main_note = build_reference_note(md_data)
+    source_note = build_source_note(md_data)
+    result = writer.save(md_data, main_note, source_note)
+
+    assert "note_path" in result
+    assert "transcript_path" in result
+    main_file = Path(result["note_path"])
+    source_file = Path(result["transcript_path"])
+    assert main_file.exists()
+    assert source_file.exists()
+    assert source_file.name.startswith("[원문]")
+    assert "# 논문 원문" in source_file.read_text(encoding="utf-8")
+
+
+def test_md_voice_memo_also_saves_dual_note(tmp_path):
+    """MD voice_memo 임포트: 단일 노트 카테고리도 MD일 때 dual-note 저장."""
+    vault = tmp_path / "Vault"
+    md_data = NoteData(
+        date=date(2026, 2, 20),
+        title="아이디어 메모",
+        audio_filename="idea.md",
+        duration="0:00",
+        speakers=[],
+        purpose="", discussion=[], decisions=[], action_items=[], follow_up=[],
+        transcript=[],
+        category="voice_memo",
+        extra={"summary": "요약", "key_points": [], "action_items": []},
+        source_type="md",
+        md_source_text="# 아이디어\n내용",
+    )
+    writer = VaultWriter(vault, folder_overrides={"voice_memo": "Inbox"})
+    from pipeline.note_builder import build_voice_memo_note
+    main_note = build_voice_memo_note(md_data)
+    source_note = build_source_note(md_data)
+    result = writer.save(md_data, main_note, source_note)
+
+    assert Path(result["transcript_path"]).name.startswith("[원문]")

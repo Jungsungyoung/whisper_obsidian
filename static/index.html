@@ -473,6 +473,32 @@
     /* ── CATEGORY FORM GROUPS ── */
     .cat-fields { display: none; }
     .cat-fields.visible { display: block; }
+
+    /* ── 업로드 모드 탭 ── */
+    .upload-mode-tabs {
+      display: flex; gap: 4px; margin-bottom: 14px;
+    }
+    .mode-tab {
+      padding: 6px 14px; border-radius: 6px; border: 1px solid var(--border);
+      background: var(--surface-2); color: var(--text-2);
+      font-family: var(--font); font-size: 0.8rem; cursor: pointer;
+      transition: all .15s;
+    }
+    .mode-tab:hover { border-color: var(--border-strong); color: var(--text); }
+    .mode-tab.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+    /* ── MD 드롭존 ── */
+    #md-drop-zone {
+      border: 1.5px dashed var(--border-strong); border-radius: var(--radius);
+      padding: 28px 20px; text-align: center; cursor: pointer;
+      background: var(--surface-2); margin-bottom: 14px;
+      transition: all .2s;
+    }
+    #md-drop-zone:hover, #md-drop-zone.over {
+      border-color: var(--accent); background: var(--accent-bg);
+    }
+    #md-drop-zone:hover .dz-icon, #md-drop-zone.over .dz-icon { color: var(--accent); }
+    #md-fname { font-size: 0.78rem; color: var(--accent); margin-top: 8px; font-weight: 500; min-height: 1em; word-break: break-all; }
   </style>
 </head>
 <body>
@@ -603,6 +629,14 @@
   <div class="col-left">
     <div class="card">
       <div class="card-body">
+        <!-- 업로드 방식 선택 -->
+        <div class="upload-mode-tabs">
+          <button class="mode-tab active" data-mode="audio">🎙 오디오</button>
+          <button class="mode-tab" data-mode="md">📄 MD 파일</button>
+        </div>
+
+        <!-- 오디오 입력 섹션 -->
+        <div id="audio-input-section">
         <!-- 드롭존 -->
         <div id="drop-zone" role="button" tabindex="0" aria-label="파일 업로드 영역"
              onclick="document.getElementById('fi').click()"
@@ -639,6 +673,26 @@
         </div>
 
         <input type="file" id="fi" accept="*/*">
+        </div><!-- /audio-input-section -->
+
+        <!-- MD 파일 입력 섹션 -->
+        <div id="md-input-section" style="display:none">
+          <div id="md-drop-zone" role="button" tabindex="0" aria-label="MD 파일 업로드"
+               onclick="document.getElementById('md-fi').click()"
+               onkeydown="if(event.key==='Enter')document.getElementById('md-fi').click()">
+            <div class="dz-icon">
+              <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                <polyline points="14 2 14 8 20 8"/>
+                <line x1="16" y1="13" x2="8" y2="13"/>
+              </svg>
+            </div>
+            <div class="dz-text">MD 파일을 드래그하거나 클릭하세요</div>
+            <div class="dz-hint">.md 파일</div>
+            <div id="md-fname"></div>
+          </div>
+          <input type="file" id="md-fi" accept=".md">
+        </div><!-- /md-input-section -->
 
         <!-- 카테고리 선택 -->
         <div class="category-tabs" style="margin-top:16px">
@@ -730,7 +784,7 @@
             <div class="ico"></div><span class="step-label">업로드</span>
           </div>
           <div class="step" id="s-trans">
-            <div class="ico"></div><span class="step-label">Whisper 전사</span>
+            <div class="ico"></div><span class="step-label" id="s-trans-label">Whisper 전사</span>
           </div>
           <div class="step" id="s-ai">
             <div class="ico"></div><span class="step-label">AI 분석</span>
@@ -771,7 +825,7 @@
       </div>
       <div class="review-body">
         <!-- 공통: 화자 이름 -->
-        <div class="rv-field">
+        <div class="rv-field" id="rv-speaker-section">
           <label>화자 이름 지정 <span class="opt">(선택)</span></label>
           <div id="rv-speakers"></div>
         </div>
@@ -796,7 +850,7 @@
             <span class="obs-btn-icon">📝</span><span id="lnk-note-label">노트 열기</span>
           </a>
           <a id="lnk-transcript" class="obs-btn" href="#" style="display:none">
-            <span class="obs-btn-icon">📄</span>전사 노트 열기
+            <span class="obs-btn-icon">📄</span><span id="lnk-transcript-label">전사 노트 열기</span>
           </a>
         </div>
       </div>
@@ -807,6 +861,30 @@
 <script>
   // ── 카테고리 탭 ────────────────────────────────────────────────────────
   let currentCategory = 'meeting';
+
+  // ── 업로드 모드 ─────────────────────────────────────────────────────────
+  let uploadMode = 'audio';
+  let mdFile = null;
+  let currentSourceType = 'audio';
+  let currentMdSourceText = '';
+
+  function switchUploadMode(mode) {
+    uploadMode = mode;
+    document.getElementById('audio-input-section').style.display = mode === 'audio' ? 'block' : 'none';
+    document.getElementById('md-input-section').style.display = mode === 'md' ? 'block' : 'none';
+    const transLabel = document.getElementById('s-trans-label');
+    if (transLabel) transLabel.textContent = mode === 'md' ? 'MD 읽기' : 'Whisper 전사';
+    const hasFile = mode === 'audio' ? !!file : !!mdFile;
+    document.getElementById('btn').disabled = !hasFile;
+  }
+
+  document.querySelectorAll('.mode-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.mode-tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      switchUploadMode(tab.dataset.mode);
+    });
+  });
 
   const CAT_FIELDS = {
     meeting:    'fields-meeting-like',
@@ -890,6 +968,19 @@
   });
   fi.addEventListener('change', () => { if (fi.files[0]) setFile(fi.files[0]); });
   function setFile(f) { file = f; fname.textContent = f.name; btn.disabled = false; }
+
+  const mdFi    = document.getElementById('md-fi');
+  const mdDz    = document.getElementById('md-drop-zone');
+  const mdFname = document.getElementById('md-fname');
+
+  mdDz.addEventListener('dragover', e => { e.preventDefault(); mdDz.classList.add('over'); });
+  mdDz.addEventListener('dragleave', () => mdDz.classList.remove('over'));
+  mdDz.addEventListener('drop', e => {
+    e.preventDefault(); mdDz.classList.remove('over');
+    if (e.dataTransfer.files[0]) setMdFile(e.dataTransfer.files[0]);
+  });
+  mdFi.addEventListener('change', () => { if (mdFi.files[0]) setMdFile(mdFi.files[0]); });
+  function setMdFile(f) { mdFile = f; mdFname.textContent = f.name; btn.disabled = false; }
 
   // ── 마이크 녹음 ────────────────────────────────────────
   let recChunks = [], mediaRecorder = null, recStream = null;
@@ -1000,7 +1091,8 @@
   });
 
   btn.addEventListener('click', async () => {
-    if (!file) return;
+    const activeFile = uploadMode === 'md' ? mdFile : file;
+    if (!activeFile) return;
     btn.disabled = true; currentJobId = null; lastLogIndex = 0;
     const logPanel = document.getElementById('log-panel');
     logPanel.innerHTML = ''; logPanel.style.display = 'none';
@@ -1016,7 +1108,7 @@
 
     const { titleVal, contextVal } = getFormValues();
     const fd = new FormData();
-    fd.append('file', file);
+    fd.append('file', activeFile);
     fd.append('title', titleVal);
     fd.append('project', document.getElementById('project').value || '');
     fd.append('context', contextVal);
@@ -1046,7 +1138,7 @@
           setStep('s-ai', 'done');
           setProgress(97, '분석 완료 — 내용을 확인하고 저장하세요.');
           appendLogs(d.logs);
-          showReviewPanel(d.analysis, d.speakers, d.category || 'meeting', d.segments || []);
+          showReviewPanel(d.analysis, d.speakers, d.category || 'meeting', d.segments || [], d.source_type || 'audio', d.md_source_text || '');
           return;
         } else if (d.status === 'confirmed' || d.status === 'building' || d.status === 'saving') {
           hide('review-panel'); cancelBtn.style.display = 'block';
@@ -1074,6 +1166,8 @@
           const transcriptLink = document.getElementById('lnk-transcript');
           if (d.result.transcript_uri) {
             transcriptLink.href = d.result.transcript_uri;
+            const label = document.getElementById('lnk-transcript-label');
+            if (label) label.textContent = d.source_type === 'md' ? '원문 노트 열기' : '전사 노트 열기';
             transcriptLink.style.display = 'flex';
           } else {
             transcriptLink.style.display = 'none';
@@ -1171,19 +1265,26 @@
     ],
   };
 
-  function showReviewPanel(analysis, speakers, category, segments) {
+  function showReviewPanel(analysis, speakers, category, segments, sourceType, mdSourceText) {
     if (!analysis) return;
+    currentSourceType = sourceType || 'audio';
+    currentMdSourceText = mdSourceText || '';
+    currentSegments = segments || [];
     document.getElementById('right-placeholder').style.display = 'none';
 
-    currentSegments = segments || [];
+    // 화자 섹션: MD 임포트이거나 화자 없으면 숨김
+    const speakerSection = document.getElementById('rv-speaker-section');
+    if (speakerSection) {
+      speakerSection.style.display = (currentSourceType === 'md' || !speakers || speakers.length === 0) ? 'none' : 'block';
+    }
 
-    const speakerSection = document.getElementById('rv-speakers');
-    speakerSection.innerHTML = '';
+    const rvSpeakers = document.getElementById('rv-speakers');
+    rvSpeakers.innerHTML = '';
     (speakers || []).forEach(sp => {
       const row = document.createElement('div');
       row.className = 'rv-speaker-row';
       row.innerHTML = `<span class="rv-speaker-label">${sp}</span><span class="rv-speaker-arrow">→</span><input type="text" class="rv-speaker-input" data-speaker="${sp}" placeholder="실명 (비워두면 ${sp})">`;
-      speakerSection.appendChild(row);
+      rvSpeakers.appendChild(row);
     });
 
     const fields = CATEGORY_REVIEW_FIELDS[category] || CATEGORY_REVIEW_FIELDS['meeting'];
@@ -1199,7 +1300,7 @@
     });
 
     const viewBtn = document.getElementById('rv-view-transcript-btn');
-    viewBtn.style.display = currentSegments.length ? 'block' : 'none';
+    viewBtn.style.display = (currentSegments.length > 0 || currentMdSourceText) ? 'block' : 'none';
 
     document.getElementById('review-panel').style.display = 'block';
     cancelBtn.style.display = 'none';
@@ -1252,13 +1353,20 @@
   // ── 전체 전사 내용 모달 ─────────────────────────────────
   const transcriptOverlay = document.getElementById('transcript-overlay');
   document.getElementById('rv-view-transcript-btn').addEventListener('click', () => {
-    const hasSpeakers = currentSegments.some(s => s.speaker && s.speaker !== 'Speaker A' || currentSegments.length && currentSegments[0].speaker);
-    const lines = currentSegments.map(s => {
-      const ts = s.timestamp ? `[${s.timestamp}] ` : '';
-      const sp = s.speaker ? `${s.speaker}: ` : '';
-      return `${ts}${sp}${s.text}`;
-    }).join('\n');
-    document.getElementById('transcript-content').textContent = lines || '전사 내용이 없습니다.';
+    const modalTitle = document.querySelector('.transcript-modal-header .modal-title');
+    let content;
+    if (currentSourceType === 'md' && currentMdSourceText) {
+      modalTitle.textContent = 'MD 원문';
+      content = currentMdSourceText;
+    } else {
+      modalTitle.textContent = '전체 전사 내용';
+      content = currentSegments.map(s => {
+        const ts = s.timestamp ? `[${s.timestamp}] ` : '';
+        const sp = s.speaker ? `${s.speaker}: ` : '';
+        return `${ts}${sp}${s.text}`;
+      }).join('\n');
+    }
+    document.getElementById('transcript-content').textContent = content || '내용이 없습니다.';
     transcriptOverlay.classList.add('open');
   });
   document.getElementById('transcript-close').addEventListener('click', () => transcriptOverlay.classList.remove('open'));

@@ -26,14 +26,29 @@ from pipeline.transcriber import transcribe
 from pipeline.analyzer import analyze_transcript
 from pipeline.note_builder import (
     NoteData, build_meeting_note, build_transcript_note,
-    build_discussion_note, build_note,
+    build_discussion_note, build_note, build_source_note,
 )
 from pipeline.vault_writer import VaultWriter
 
 # in-memory job store (단일 프로세스)
 job_status: dict[str, dict] = {}
 
-ALLOWED_EXTENSIONS = {".mp3", ".wav", ".m4a", ".mp4", ".webm", ".ogg"}
+ALLOWED_EXTENSIONS = {".mp3", ".wav", ".m4a", ".mp4", ".webm", ".ogg", ".md"}
+
+
+def read_md_text(path: Path) -> str:
+    """MD 파일을 UTF-8 → UTF-8-sig → Latin-1 순서로 디코딩 시도."""
+    for encoding in ("utf-8", "utf-8-sig", "latin-1"):
+        try:
+            text = path.read_text(encoding=encoding)
+            break
+        except UnicodeDecodeError:
+            continue
+    else:
+        raise ValueError("MD 파일 디코딩 실패 (지원하지 않는 인코딩)")
+    if not text.strip():
+        raise ValueError("MD 파일이 비어있습니다")
+    return text
 
 
 @asynccontextmanager
@@ -153,7 +168,10 @@ async def upload(
 
     job_id = str(uuid.uuid4())
     save_path = config.UPLOAD_DIR / f"{job_id}{suffix}"
-    save_path.write_bytes(await file.read())
+    content = await file.read()
+    if suffix == ".md" and len(content) > 5 * 1024 * 1024:
+        raise HTTPException(400, "MD 파일은 5MB 이하만 허용됩니다")
+    save_path.write_bytes(content)
 
     effective_title = title.strip() or Path(file.filename).stem
     job_status[job_id] = {"status": "queued", "step": "", "progress": 0, "detail": "", "elapsed": 0, "result": None, "error": None, "logs": []}
@@ -363,8 +381,22 @@ def _process(job_id: str, audio_path: Path, title: str, project: str, original_f
         })
 
     try:
-        update("transcribing", "전사 중...", 0, "모델 준비 중...")
-        transcript_result = transcribe(audio_path, on_progress=on_transcribe_progress, context=context)
+        suffix = audio_path.suffix.lower()
+        is_md = (suffix == ".md")
+        md_raw = ""
+
+        if is_md:
+            update("analyzing", "MD 파일 읽는 중...", 10, "MD 파일 읽는 중...")
+            md_raw = read_md_text(audio_path)
+            transcript_result = {
+                "segments": [],
+                "full_text": md_raw,
+                "duration": "0:00",
+                "method": "md-import",
+            }
+        else:
+            update("transcribing", "전사 중...", 0, "모델 준비 중...")
+            transcript_result = transcribe(audio_path, on_progress=on_transcribe_progress, context=context)
 
         if is_cancelled():
             mark_cancelled()
@@ -387,6 +419,8 @@ def _process(job_id: str, audio_path: Path, title: str, project: str, original_f
             "category": category,
             "speakers": review_speakers,
             "segments": transcript_result["segments"],
+            "source_type": "md" if is_md else "audio",
+            "md_source_text": md_raw,
             "elapsed": int(time.time() - start_time),
         })
 
@@ -428,9 +462,11 @@ def _process(job_id: str, audio_path: Path, title: str, project: str, original_f
                 transcript=transcript_result["segments"],
                 project=project,
                 category=category,
+                source_type="md" if is_md else "audio",
+                md_source_text=md_raw,
             )
             main_note = build_discussion_note(note_data) if category == "discussion" else build_meeting_note(note_data)
-            transcript_note = build_transcript_note(note_data)
+            transcript_note = build_source_note(note_data) if is_md else build_transcript_note(note_data)
         else:
             note_data = NoteData(
                 date=date.today(),
@@ -443,9 +479,11 @@ def _process(job_id: str, audio_path: Path, title: str, project: str, original_f
                 project=project,
                 category=category,
                 extra=analysis,
+                source_type="md" if is_md else "audio",
+                md_source_text=md_raw,
             )
             main_note = build_note(note_data)
-            transcript_note = None
+            transcript_note = build_source_note(note_data) if is_md else None
 
         update("saving", "Vault에 저장 중...", 99, "파일 저장 중...")
         writer = VaultWriter(config.VAULT_PATH)
